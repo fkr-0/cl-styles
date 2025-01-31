@@ -1,0 +1,225 @@
+
+;; TODO
+
+;; improved ordering:
+;; (defun ordered-styles (styles)
+;;   "Sort STYLES in an order where dependencies are respected using a topological sort."
+;;   (let ((graph (make-hash-table))
+;;         (in-degree (make-hash-table))
+;;         (sorted-styles (list))
+;;         (queue (make-queue)))
+
+;;     ;; Build the graph and in-degree table
+;;     (dolist (style styles)
+;;       (setf (gethash style in-degree) 0))
+
+;;     (dolist (style styles)
+;;       (dolist (dependency (apply-after style styles))
+;;         (push style (gethash dependency graph))
+;;         (incf (gethash style in-degree))))
+
+;;     ;; Enqueue styles with no dependencies
+;;     (maphash (lambda (style degree)
+;;                (when (zerop degree)
+;;                  (enqueue style queue)))
+;;              in-degree)
+
+;;     ;; Process the queue
+;;     (loop while (queue-not-empty-p queue) do
+;;       (let ((current (dequeue queue)))
+;;         (push current sorted-styles)
+;;         (dolist (dependent (gethash current graph))
+;;           (decf (gethash dependent in-degree))
+;;           (when (zerop (gethash dependent in-degree))
+;;             (enqueue dependent queue)))))
+
+;;     ;; Check for cycles in the graph
+;;     (when (< (length sorted-styles) (length styles))
+;;       (error "Cycle detected in style dependencies, cannot sort"))
+
+;;     ;; Return the sorted list
+;;     (nreverse sorted-styles)))
+
+
+;;; ====================
+;;; style rules
+;;; ====================
+;; (defmethod apply-style ((stylable stylable) (style style))
+;;   "Apply the given style to the given stylable."
+;;   (implement-style stylable (style-property style) (value-value (style-val style))))
+;; (defmethod apply-style ((stylable list) (style style))
+;;   "Apply the given style to the given stylable."
+;;   (dolist (stylable (select-stylables (style-selector style) stylable))
+;;     (implement-style stylable (style-property style) (value-value (style-val style)))))
+;; (defmethod render ((object stylable))
+;;   "Render a stylable, re-applying styles if necessary."
+;;   (when (dirty object)
+;;     ;; Re-apply styles.
+;;     (apply-stylesheet object *stylesheet*)
+;;     ;; Reset the dirty flag.
+;;     (setf (dirty object) nil))
+;;   ;; Render the object.
+;;   ;; ...
+;;   )
+;; (defmethod add-rule ((sheet stylesheet) rule)
+;;   "Add a style rule to a stylesheet."
+;;   (push rule (rules sheet))
+;;   ;; Mark all objects that match the rule's selector as dirty.
+;;   (mark-dirty (matched-objects rule)))
+;; Mark all matched objects as dirty.
+;; (mark-dirty (matched-objects rule)))
+;;; other / utils
+;; TODO rework this
+;; (defun prop-to-style (prop val)
+;;   "Convert a property name to a CSS class name."
+;;   (when (keywordp prop)
+;;     (format nil "~(~a~)" (string-upcase (symbol-name prop)))
+;;     (format nil "~(~a~)" prop)))
+;; (defmethod key-value-to-rule ((widget widget) key val)
+;;   "Convert a key-value pair to a style rule."
+;;   (let ((selector (make-instance 'selector :name (widget-name widget)))
+;;           (property (make-instance 'property :name key))
+;;           (value (make-instance 'value :value val)))
+;;     (make-instance 'style-rule :selector selector :property property :value value)))
+                                        ; )
+;; (defmacro from-plist (plist)
+;;   ""
+;;   `(plist-to-hash-table (destructure-padding-margin ,plist)))
+;; (defmethod apply-style ((property property) (value value) (component button))
+;;   "Apply the given property to the given button component with the given value."
+;;   (case (property-name property)
+;;     (:background-color (setf (button-background-color component)
+;;                        (value-value value)))
+;;     (:color (setf (button-text-color component) (value-value value)))))
+;; (defmacro )
+;; Next, create style rules for the button styles:
+;; (defparameter *button-style-rule*
+;;   (make-instance 'style-rule
+;;     :selector *button-selector*
+;;     :property *background-color-property*
+;;     :value *default-background-color*))
+;; (defparameter *button-text-color-rule*
+;;   (make-instance 'style-rule
+;;     :selector *button-selector*
+;;     :property *text-color-property*
+;;     :value *default-text-color*))
+;; (defparameter *distinct-button-style-rule*
+;;   (make-instance 'style-rule
+;;     :selector *distinct-button-selector*
+;;     :property *background-color-property*
+;;     :value *distinct-background-color*))
+;; ;; Finally, create a style set and apply the style rules:
+;; (defparameter *style-set* (make-instance 'style-set :rules nil))
+;; (setf (style-set-rules *style-set*)
+;;   (apply-style-rules (style-set-rules *style-set*)
+;;     (list *button-style-rule* *button-text-color-rule*
+;;       *distinct-button-style-rule*)))
+;; (defclass button () ((id :accessor button-id) (class :accessor button-class)))
+;; ;; Now, let's create a function to apply the style set to a button component:
+;; (defun apply-style-set-to-button (style-set button)
+;;   "Apply the given style set to the given button component."
+;;   (let ((rules (style-set-rules style-set)))
+;;     (loop for rule in rules
+;;       when (string= (selector-name (rule-selector rule))
+;;              (button-class button))
+;;       do (setf (button-class button)
+;;            (selector-name (rule-selector rule)))
+;;       (setf (button-id button) (value-value (rule-value rule))))))
+;; ;; This function takes a style set and a button component as arguments, and applies the corresponding style rule to the button component by setting its class and ID attributes.
+;; ;; To apply the style set to a distinct button, you can create a new button component with a unique ID attribute and call the apply-style-set-to-button function with the style set and the new button component as arguments:
+;; (let ((style-set *style-set*)
+;;        (button (make-instance 'button :class "button" :id "my-button"))
+;;        (distinct-button
+;;          (make-instance 'button :class "button" :id "distinct-button")))
+;;   (apply-style-set-to-button style-set button)
+;;   (apply-style-set-to-button style-set distinct-button))
+;; In this example, we create two button components: one with the class "button" and ID "my-button", and another with the class "button" and ID "distinct-button". We then call the apply-style-set-to-button function with the style set and each button component as arguments.
+;; (defstyle :abcd (list :v1 :v2 :v3 :v4))
+;; (defstyle :efgh (list :x1 :x2 :x3 :x4))
+;; (let ((p1  (list :abcd :v2 :efgh :x4))
+;;        (p2 (list (list :abcd :v2) (list :efgh :x4)))
+;;        (p3 (list (make-style :abcd :v2) (make-style :efgh :x4)))
+;;        (p4  (append (parse-styles (make-style :abcd :v2)) (parse-styles (make-style :efgh :x4)))))
+;;   (assert (equal (parse-styles p1) (parse-styles p2)))
+;;   (assert (equal (parse-styles p1) (parse-styles p3)))
+;;   (assert (equal (parse-styles p1)  p4)))
+
+;; (defmethod apply-style ((widget style-component) (style style))
+;;   "Apply the given style style to the widget's styles."
+;;   (let* ((styles (slot-value widget 'styles))
+;;           (prop (property-name (style-prop style)))
+;;           (value (value-value (style-val style))))
+;;     (setf (gethash prop styles) value)))
+;; (defmethod apply-style-styles ((widget style-component) (styles list))
+;;   "Apply the given list of style styles to the widget's styles."
+;;   (mapc #'(lambda (style) (apply-style widget style)) styles))
+
+;; (defgeneric stylegroup-p (obj)
+;;   (:documentation
+;;     "Return t if the given object is a style group, nil otherwise."))
+
+
+
+;; selectors
+
+;; (defmacro parent-child (parent-selector child-selector)
+;;   `(make-instance 'complex-selector
+;;      :child-selector ,child-selector
+;;      :relationship-type 'parent))
+
+;; (defmethod select-stylables ((selector selector) (stylables list))
+;;   "Select stylables from the list that match the selector."
+;;   (remove-if-not
+;;     (lambda (stylable) (string= (stylable-id stylable) (sel-name selector)))
+;;     stylables))
+
+;; (defmethod select-stylables ((selector selector) (stylables stylable))
+;;   "Select stylables from the list that match the selector."
+;;   (if (string= (stylable-id stylables) (sel-name selector))
+;;     (list stylables)
+;;     nil))
+
+;; (defmethod mark-dirty ((stylables list))
+;;   "Mark all stylables that match the selector as dirty."
+;;   (dolist (stylable stylables) (setf (dirty stylable) t)))
+
+;; (defmethod mark-dirty ((stylable stylable))
+;;   "Mark all stylables that match the selector as dirty."
+;;   (setf (dirty stylable) t))
+
+
+
+;; ;; (defmethod selects ((selector combined-selector) (target stylable))
+;; ;;   "Determine if all sub-selectors in the combined-selector match the given target."
+
+;; ;;   ;; Check if every sub-selector matches the target.
+;; ;;   (every #'(lambda (sub-selector) (selects sub-selector target))
+;; ;;     (sub-selectors-of selector)))
+;; ;; (defmethod selects ((selector parent-selector) (target stylable))
+;; ;;   "Checks if the target's parent matches the specified criteria."
+;; ;;   ;; Implementation depends on your component model
+;; ;;   ;; Traverse the parent of the target and check if it matches the selector's criteria
+;; ;;   )
+
+;; (defmacro and (&rest selectors)
+;;   `(make-instance 'combined-selector :sub-selectors (list ,@selectors)))
+
+;; (defmethod selects ((selector complex-selector) (target stylable))
+;;   "Recursively evaluate if the target matches the complex selector's hierarchy."
+
+;;   ;; Implementation depends on the relationship type and component model.
+;;   ;; Example for a parent-child relationship:
+;;   (case (relationship-type-of selector)
+;;     (parent (and (selects (parent-of target) (child-selector-of selector))
+;;               ;; Additional checks for the target itself
+;;               ))
+;;     ;; Other relationship types (e.g., ancestor) can be added here.
+;;     ))
+;; (defmacro parent-child (parent-selector child-selector)
+;;   `(make-instance 'complex-selector
+;;      :child-selector ,child-selector
+;;      :relationship-type 'parent))
+
+;; (equal (slot-value selector 'parent-selector) (slot-value other 'parent-selector))
+;; (equal (slot-value selector 'child-selector) (slot-value other 'child-selector))
+;; (equal (slot-value selector 'relationship-type) (slot-value other 'relationship-type))))
