@@ -1,28 +1,28 @@
-(uiop:define-package :uncharming-tui.styles.stylesheet
-  (:nicknames :ut.styles.stylesheet) (:use :common-lisp)
+(uiop:define-package :cl-styles.stylesheet
+  (:nicknames :styles.stylesheet)
+  (:use :common-lisp)
   (:import-from :log4cl :log-info)
-  (:import-from :ut.config :=?)
-  (:import-from :ut.util :hash-table-keys)
-  (:import-from :ut.styles.styles :value-value :style-val
-   :style :tuple-value :tuple-prop :stylegroup-p)
-  (:import-from :ut.styles.stylable :make-style :styles
-   :style-group :style-sub-styles)
-  (:import-from :ut.styles.style-set :new :copy :style-set
-                :*default-styles* :style-of :merge-styles!
-   :style-set-styles)
-  (:import-from :ut.styles.rule :defrule :style-rule
+  (:import-from :cl-styles.api :stylesheet
+                :stylesheet-rules :style-set
+                :value-value :style-val
+                :style-property :style)
+  (:import-from :cl-styles.util :=?)
+  (:import-from :cl-styles.util :hash-table-keys)
+  (:import-from :cl-styles.styles :tuple-prop :stylegroup-p
+   :styles :style-group :style-sub-styles :tuple-value)
+  (:import-from :cl-styles.style-set :new :copy
+   :*default-styles* :style-of :merge-styles!
+                :style-set-styles)
+  (:import-from :cl-styles.rule :defrule :style-rule
    :rule-selector :rule-styles)
-  (:import-from :ut.styles.selector :selects :cls>
+  (:import-from :cl-styles.selector :selects :cls>
    :selection-specificity :cl-cls>)
-  (:export :stylesheet :add-rule :query-style-sheet
-   :defstylesheet :my-stylesheet ))
+  (:export  :add-rule :query-style-sheet
+            :defstylesheet :my-stylesheet ))
 
-(in-package :uncharming-tui.styles.stylesheet)
+(in-package :cl-styles.stylesheet)
 
-(defclass stylesheet ()
-  ((name :initarg :name :accessor stylesheet-name)
-   (rules :initarg :rules :accessor stylesheet-rules))
-  (:documentation "A stylesheet is a collection of style rules."))
+
 
 (defmethod merge-rule! ((sheet stylesheet) (rule style-rule))
   "Add or merge a style rule RULE into the stylesheet SHEET.
@@ -126,48 +126,48 @@ Returns a style set containing the styles that apply to the target."
 
 (defvar item
   (defrule (cls> "item")
-    ;; (:bg-color :blue)
-    ;; (:fg-color :white)
-    (:box :single)
+      ;; (:bg-color :blue)
+      ;; (:fg-color :white)
+      (:box :single)
     ;; (:padding 0)
     ))
 
 (defvar focus
   (defrule (cls> "focus")
-    (:bg-color 102)
+      (:bg-color 102)
     (:fg-color 46)))
 
 (defvar unfocus
   (defrule (cls> "unfocus")
-    (:bg-color 26)
+      (:bg-color 26)
     (:fg-color 122)))
 
 (defvar label
   (defrule (cls> "label")
-    (:box :none)
+      (:box :none)
     (:underline t)
     (:align :center)))
 (defvar label
   (defrule (cls> "list-item")
-    (:box :none)
+      (:box :none)
     (:underline t)
     (:align :center)))
 (defvar scroll
   (defrule (cls> "scroll")
-    (:scrollbar-v t)
+      (:scrollbar-v t)
     (:width 12) (:height 19)))
 
 (defvar my-stylesheet
   (defstylesheet
-    (defrule (cls> "button")
-      (:box :ascii))
+      (defrule (cls> "button")
+          (:box :ascii))
     ;;   ;; ( :margin 0)
     ;;   )
     ;; (defrule (cls> "important") (:fg-color :red :bold t))
     ;; label focus item
     label
     (defrule (cls> "container")
-      (:box :single :bg-color 33 :fg-color 12))
+        (:box :single :bg-color 33 :fg-color 12))
     focus
     unfocus
     scroll))

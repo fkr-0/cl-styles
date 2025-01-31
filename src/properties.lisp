@@ -1,17 +1,18 @@
-(uiop:define-package :uncharming-tui.styles.properties (:use :common-lisp)
-  (:nicknames :ut.styleprops :ut.styles.properties)
-  (:import-from :str :split :upcase)
-  (:import-from :ut.styles.styles :make-style :value
-    :apply-after :stylegroup-p :tuple-value)
-  (:import-from :ut.styles.macros :defstyle :defstylegroup)
-  (:import-from :lowterm :new-fg-color :new-bg-color)
-  (:import-from :uncharming-tui.styles.stylable :stylable
-    :style-sub-styles :style-group :stylable-id :classes)
-  (:import-from :ut.config :*pad-fill-char*
-    :*margin-fill-char*)
-  (:import-from :ut.util :keyword-split))
+(uiop:define-package :cl-styles.properties (:use :common-lisp)
+                     (:nicknames :styles.styleprops :styles.properties)
+                     (:import-from :str :split :upcase)
+                     (:import-from :cl-styles.api :make-style :value
+                      :apply-after :stylegroup-p :tuple-value)
 
-(in-package :uncharming-tui.styles.properties)
+                     (:import-from :cl-styles.macros :defstyle :defstylegroup)
+                     ;; (:import-from :lowterm :new-fg-color :new-bg-color)
+                     (:import-from :cl-styles.stylable :stylable
+                                   :style-sub-styles :style-group :stylable-id :classes)
+                     (:import-from :cl-styles.util :*pad-fill-char*
+                                   :*margin-fill-char*)
+                     (:import-from :cl-styles.util :keyword-split))
+
+(in-package :cl-styles.properties)
 (defmacro defstyle2 (name type &rest options &key (category :decoration) (related-styles '()))
   "Define a style with category and related styles.
    NAME: The name of the style (keyword)
@@ -22,9 +23,9 @@
   `(progn
      (defstyle ,name ,type ,@options)
      (setf (get ',name 'style-metadata)
-       (make-instance 'style-metadata
-         :category ,category
-         :related-styles ',related-styles))))
+           (make-instance 'style-metadata
+                          :category ,category
+                          :related-styles ',related-styles))))
 ;; (defmacro defstyle2 (name type &key category related-styles &rest options)
 ;;   "Define a style with category and related styles.
 ;;    NAME: The name of the style (keyword)
@@ -62,7 +63,7 @@ Example:
                 (t (error "Invalid value specifier: ~A" x)))))))
     (lambda (x)
       (loop for arg in args
-        thereis (funcall (funcall testfn arg) x)))))
+            thereis (funcall (funcall testfn arg) x)))))
 
 (defstyle :box (list :none :single :double :ascii :full-block) :default :none
   :docstring "The box style to use for the element." :decorating-after
@@ -107,22 +108,22 @@ integers, each between 0 and 255.
 Returns: nil if invalid color, else non-nil"
   (typecase (car clrs)
     (symbol
-      (member (car clrs)
-        (list :black :red
-          :green :yellow
-          :blue :magenta
-          :cyan :white
-          :default :bright-black
-          :bright-red :bright-green
-          :bright-yellow :bright-blue)))
+     (member (car clrs)
+             (list :black :red
+                   :green :yellow
+                   :blue :magenta
+                   :cyan :white
+                   :default :bright-black
+                   :bright-red :bright-green
+                   :bright-yellow :bright-blue)))
     (list
-      (if (listp (car (car clrs)))
-        (is-color (car clrs))
-        (and (every #'integerp (car clrs))
-          (or (= 1 (length (car clrs))) (= 3 (length (car clrs)))))))
+     (if (listp (car (car clrs)))
+         (is-color (car clrs))
+         (and (every #'integerp (car clrs))
+              (or (= 1 (length (car clrs))) (= 3 (length (car clrs)))))))
     (integer
-      (and (every #'integerp clrs)
-        (or (= 1 (length clrs)) (= 3 (length clrs)))))))
+     (and (every #'integerp clrs)
+          (or (= 1 (length clrs)) (= 3 (length clrs)))))))
 
 ;; (is-color '( 1 2 3))
 ;; (defstyle :slurp #'is-color :default (list 1 2 3)
@@ -168,39 +169,39 @@ Returns: nil if invalid color, else non-nil"
   "Padding below the element.")
 
 (defstylegroup (:groups
-                 (:padding-top :padding-bottom :padding-left :padding-right
-                   :padding-char :padding-charstyle)
-                 :decorating-after :top)
-  (unless value
-    (setf value 0))
+                (:padding-top :padding-bottom :padding-left :padding-right
+                 :padding-char :padding-charstyle)
+                :decorating-after :top)
+    (unless value
+      (setf value 0))
   (when (integerp value)
     (setf value (list value)))
   (when (listp value)
     (let ((l nil))
       (case (length value)
         (1
-          (progn
-            (dolist
-              (s '(:padding-top :padding-bottom :padding-left :padding-right))
-              (push (make-style s (first value)) l))))
+         (progn
+           (dolist
+               (s '(:padding-top :padding-bottom :padding-left :padding-right))
+             (push (make-style s (first value)) l))))
         (2
-          (progn
-            (dolist (s '(:padding-top :padding-bottom))
-              (push (make-style s (first value)) l))
-            (dolist (s '(:padding-left :padding-right))
-              (push (make-style s (second value)) l))))
+         (progn
+           (dolist (s '(:padding-top :padding-bottom))
+             (push (make-style s (first value)) l))
+           (dolist (s '(:padding-left :padding-right))
+             (push (make-style s (second value)) l))))
         (3
-          (progn
-            (push (make-style :padding-top (first value)) l)
-            (push (make-style :padding-bottom (second value)) l)
-            (dolist (s '(:padding-left :padding-right))
-              (push (make-style s (second (cdr value))) l))))
+         (progn
+           (push (make-style :padding-top (first value)) l)
+           (push (make-style :padding-bottom (second value)) l)
+           (dolist (s '(:padding-left :padding-right))
+             (push (make-style s (second (cdr value))) l))))
         (4
-          (progn
-            (push (make-style :padding-top (first value)) l)
-            (push (make-style :padding-bottom (second value)) l)
-            (push (make-style :padding-left (cdr (second value))) l)
-            (push (make-style :padding-right (cdr (cdr (second value)))) l))))
+         (progn
+           (push (make-style :padding-top (first value)) l)
+           (push (make-style :padding-bottom (second value)) l)
+           (push (make-style :padding-left (cdr (second value))) l)
+           (push (make-style :padding-right (cdr (cdr (second value)))) l))))
       l)))
 
 (defstyle :margin-top 'integer :default 0 :docstring
@@ -222,36 +223,36 @@ Returns: nil if invalid color, else non-nil"
   "Padding below the element.")
 
 (defstylegroup (:groups
-                 (:margin-top :margin-bottom :margin-left :margin-right
-                   :margin-char :margin-charstyle)
-                 :decorating-after :box)
-  (unless value
-    (setf value 0))
+                (:margin-top :margin-bottom :margin-left :margin-right
+                 :margin-char :margin-charstyle)
+                :decorating-after :box)
+    (unless value
+      (setf value 0))
   (when (integerp value)
     (setf value (list value)))
   (when (listp value)
     (let ((l nil))
       (case (length value)
         (1
-          (progn
-            (dolist (s '(:margin-top :margin-bottom :margin-left :margin-right))
-              (push (make-style s (first value)) l))))
+         (progn
+           (dolist (s '(:margin-top :margin-bottom :margin-left :margin-right))
+             (push (make-style s (first value)) l))))
         (2
-          (progn
-            (dolist (s '(:margin-top :margin-bottom))
-              (push (make-style s (first value)) l))
-            (dolist (s '(:margin-left :margin-right))
-              (push (make-style s (second value)) l))))
+         (progn
+           (dolist (s '(:margin-top :margin-bottom))
+             (push (make-style s (first value)) l))
+           (dolist (s '(:margin-left :margin-right))
+             (push (make-style s (second value)) l))))
         (3
-          (progn
-            (push (make-style :margin-top (first value)) l)
-            (push (make-style :margin-bottom (second value)) l)
-            (dolist (s '(:margin-left :margin-right))
-              (push (make-style s (second (cdr value))) l))))
+         (progn
+           (push (make-style :margin-top (first value)) l)
+           (push (make-style :margin-bottom (second value)) l)
+           (dolist (s '(:margin-left :margin-right))
+             (push (make-style s (second (cdr value))) l))))
         (4
-          (progn
-            (push (make-style :margin-top (first value)) l)
-            (push (make-style :margin-bottom (second value)) l)
-            (push (make-style :margin-left (cdr (second value))) l)
-            (push (make-style :margin-right (cdr (cdr (second value)))) l))))
+         (progn
+           (push (make-style :margin-top (first value)) l)
+           (push (make-style :margin-bottom (second value)) l)
+           (push (make-style :margin-left (cdr (second value))) l)
+           (push (make-style :margin-right (cdr (cdr (second value)))) l))))
       l)))

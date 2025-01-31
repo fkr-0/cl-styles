@@ -1,18 +1,17 @@
-(uiop:define-package :uncharming-tui.styles.macros (:use #:cl)
-                     (:nicknames :ut.styles.macros)
-                     (:import-from :cl-styles.util :log-info :log-debug)
-                     (:import-from :cl-styles.util :split :join :upcase)
+(uiop:define-package :cl-styles.macros (:use #:cl)
+                     (:nicknames :cl-styles.styles.macros)
+                     (:import-from :log4cl :log-info :log-debug)
+                     (:import-from :str :upcase :substring :split :join)
                      (:import-from :cl-styles.util :keyword-concat :keyword-split)
                      (:import-from :cl-styles.util :=?)
-                     (:import-from :cl-styles.util :stylable
+                     (:import-from :cl-styles.stylable :stylable
                                    :implement-style :can-implement-style)
-                     (:import-from :cl-styles.util :make-style
-                                   :valid-style-value-p :style-group-key :value-value
-                      :apply-after :style-sub-styles :name :style :style-group
-                                   :property :value :default-styling)
+                     (:import-from :cl-styles.styles :valid-style-value-p :style-group-key
+                      :apply-after :style-sub-styles :style-group :property :value :group-styles)
+                     (:import-from :cl-styles.api :make-style :value-value :name :style :default-styling)
                      (:export :defstyle :defstylegroup))
 
-(in-package :ut.styles.macros)
+(in-package :cl-styles.macros)
 
 (defmacro defstyle
     (name value-specifier

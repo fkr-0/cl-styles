@@ -1,59 +1,18 @@
-(uiop:define-package :uncharming-tui.styles.styles (:use #:cl)
-                     (:nicknames :ut.styles.styles)
+(uiop:define-package :cl-styles.styles (:use #:cl)
+                     (:nicknames :styles.styles)
                      (:import-from :log4cl :log-info :log-debug)
                      (:import-from :str :split :join :upcase)
+                     (:import-from :cl-styles.api :make-style :style
+                      :style-property :style-val :property-name :value-value
+                      :property :value :style-component
+                                   :style-of :styles :style-of)
                      (:import-from :cl-styles.util :keyword-concat :keyword-split)
                      (:import-from :cl-styles.util :=?)
-                     (:export :style-component :property :style-sub-styles
-                      :value :value-value :=? :make-style))
+                     (:export :style-sub-styles :stylegroup-p
+                              :value :value-value :=? :make-style :ordered-styles))
 
-(in-package :ut.styles.styles)
+(in-package :cl-styles.styles)
 
-(defclass style-component () ()
-  (:documentation "Base class for style components."))
-
-(deftype style-category ()
-  '(member :layout :content :decoration :behavior))
-
-(defclass style-metadata ()
-  ((category :initarg :category
-             :accessor style-category
-             :type style-category
-             :documentation "The category this style belongs to")
-   (related-styles :initarg :related-styles
-                   :accessor style-related-styles
-                   :initform nil
-                   :documentation "List of styles that are related to this one"))
-  (:documentation "Metadata for a style including its category and relationships"))
-
-(defclass property (style-component)
-  ((name :initarg :name
-         :accessor property-name
-         :documentation "The name of the property."))
-  (:documentation "A property represents a style property."))
-
-(defclass value (style-component)
-  ((value :initarg :value :accessor value-value)
-   (type :initarg :type :accessor value-type)
-   (possible-values :initarg :possible-values :accessor value-possible-values))
-  (:documentation "A value represents the value of a style property."))
-
-(defclass style ()
-  ((property :initarg :property :accessor style-property)
-   (value :initarg :value :accessor style-val)
-   (default :initarg :default
-            :accessor style-default
-            :initform nil
-            :documentation "The default value of the style.")
-   (metadata :initarg :metadata
-             :accessor style-metadata
-             :initform nil
-             :type (or null style-metadata)
-             :documentation "Optional metadata about the style's category and relationships"))
-  (:documentation "A style is a property-value pair with optional metadata."))
-
-(defgeneric make-style (property value)
-  (:documentation "Create a new style with the given property and value."))
 
 (defmethod =? ((s1 property) (s2 property))
   "Compare two properties for equality."
@@ -112,23 +71,61 @@ no style needs to be applied before this style."))
     (setf (nth b list) tmp)
     list))
 
-(defun ordered-styles (stylelist)
-  "Return the given STYLELIST in the order in which they need to be applied.
-This is done by sorting the styles according to their :after property, if no
-valid order can be found, an error is signaled."
-  (let ((orig (copy-list stylelist)) (ctr 0))
-    (loop while (not (eq t (ordered-p orig)))
-          do (let* ((s (ordered-p orig))
-                    (after (apply-after s (cdr (member s orig)))))
-               (log-debug "ordered-styles" s)
-               (setf ctr (1+ ctr))
-               (when (and after s)
-                 (setf orig
-                       (exchange orig (position s orig)
-                                 (position after orig))))
-               (when (> ctr 1000)
-                 (error "Could not order styles: ~a" stylelist)))
-          finally (return orig))))
+;; (defun ordered-styles (stylelist)
+;;   "Return the given STYLELIST in the order in which they need to be applied.
+;; This is done by sorting the styles according to their :after property, if no
+;; valid order can be found, an error is signaled."
+;;   (let ((orig (copy-list stylelist)) (ctr 0))
+;;     (loop while (not (eq t (ordered-p orig)))
+;;           do (let* ((s (ordered-p orig))
+;;                     (after (apply-after s (cdr (member s orig)))))
+;;                (log-debug "ordered-styles" s)
+;;                (setf ctr (1+ ctr))
+;;                (when (and after s)
+;;                  (setf orig
+;;                        (exchange orig (position s orig)
+;;                                  (position after orig))))
+;;                (when (> ctr 1000)
+;;                  (error "Could not order styles: ~a" stylelist)))
+;;           finally (return orig))))
+(defun ordered-styles (styles)
+  "Sort STYLES respecting dependencies using a topological sort."
+  (let ((graph (make-hash-table :test 'equal))
+        (in-degree (make-hash-table :test 'equal))
+        (sorted-styles '())
+        (queue '()))
+
+    ;; Initialize tables
+    (dolist (style styles)
+      (setf (gethash style in-degree) 0)
+      (setf (gethash style graph) '()))
+
+    ;; Populate graph with dependencies
+    (dolist (style styles)
+      (dolist (dependency (apply-after style styles))
+        (push style (gethash dependency graph))
+        (incf (gethash style in-degree))))
+
+    ;; Enqueue styles with no dependencies
+    (maphash (lambda (style degree)
+               (when (zerop degree)
+                 (push style queue)))
+             in-degree)
+
+    ;; Process queue
+    (loop while queue do
+      (let ((current (pop queue)))
+        (push current sorted-styles)
+        (dolist (dependent (gethash current graph))
+          (decf (gethash dependent in-degree))
+          (when (zerop (gethash dependent in-degree))
+            (push dependent queue)))))
+
+    ;; Detect cycles
+    (when (< (length sorted-styles) (length styles))
+      (error "Cycle detected in style dependencies, cannot sort"))
+
+    (nreverse sorted-styles)))
 
 (defun kw-specializer (meth)
   "Return the keyword specializer of the given method, or nil if the method does not have a keyword specializer.

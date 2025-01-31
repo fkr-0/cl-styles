@@ -6,18 +6,19 @@
   :author "Your Name <your.email@example.com>"
   :license "MIT"
   :version "0.1.0"
-  :depends-on (alexandria uiop log4cl str)
+  :depends-on (cl-reexport alexandria uiop log4cl str)
   :pathname "./src/"
   ;; Project stucture.
   :serial t
   :components ((:file "util")
                (:file "api")
+               (:file "styles")
+               (:file "style-set")
+               (:file "stylable")
                (:file "macros")
                (:file "properties")
-               (:file "rule")
                (:file "selector")
-               (:file "stylable")
-               (:file "style-set")
+               (:file "rule")
                (:file "styled-strings")
-               (:file "styles")
-               (:file "stylesheet")))
+               (:file "stylesheet")
+               (:file "cl-styles")))

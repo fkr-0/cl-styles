@@ -1,44 +1,45 @@
-(uiop:define-package :uncharming-tui.styles.style-set
-  (:nicknames :ut.styles.style-set) (:use :cl)
+(uiop:define-package :cl-styles.style-set
+  (:nicknames :styles.style-set) (:use :cl)
   (:import-from :log4cl :log-info)
-  (:import-from :uncharming-tui.stringbuffer :terminal-cell
-    :terminal-cell-term-style)
-  (:import-from :ut.styles.styles :style :style-p
-    :tuple-prop :value-value :style-property :style-val
-    :make-style :valid-style-value-p :default-styling
-    :make-default-styling :group-styles :apply-after
-    :ordered-styles :style-group-key :style-sub-styles)
-  (:import-from :ut.util :hash-table-keys :keyword-split
-    :keyword-concat)
-  (:import-from :ut.lowterm :new-fg-color :new-bg-color
-    :make-terminal-style :terminal-style :terminal-style-bold
-    :terminal-style-italic :terminal-style-strike
-    :terminal-style-underline :terminal-style-blink
-    :terminal-style-inverse :terminal-style-invisible
-    :terminal-style-fg-color :terminal-style-bg-color)
+  ;; (:import-from :cl-stringbuffer :terminal-cell
+  ;;   :terminal-cell-term-style)
+  (:import-from :cl-styles.styles :style-p :tuple-prop :group-styles :apply-after
+   :style-group-key)
+  (:import-from :cl-styles.api :style
+                :value-value :style-property :style-val
+   :make-style :valid-style-value-p :default-styling
+                :ordered-styles  :style-sub-styles)
+  (:import-from :cl-styles.styles :make-default-styling)
+  (:import-from :cl-styles.util :hash-table-keys :keyword-split
+   :keyword-concat)
+  (:import-from :cl-styles.api :make-style-set :style-set-styles
+   :style-set-order :style-set)
+  ;; (:import-from :cl-styles.lowterm :new-fg-color :new-bg-color
+  ;;  :make-terminal-style :terminal-style :terminal-style-bold
+  ;;               :terminal-style-italic :terminal-style-strike
+  ;;               :terminal-style-underline :terminal-style-blink
+  ;;               :terminal-style-inverse :terminal-style-invisible
+  ;;               :terminal-style-fg-color :terminal-style-bg-color)
   (:import-from :alexandria :flatten)
   (:export :style-of :value-of :styles-list :invert-colors :invert-colors!
-    :style-set :merge-styles! :make-terminal-style-from-style-set :new))
+   :merge-styles! :make-terminal-style-from-style-set :new))
 
-(in-package :uncharming-tui.styles.style-set)
+(in-package :cl-styles.style-set)
 
 ;; "A collection of styles represented as a hash table mapping properties to style instances.
 ;; Also contains an optional order list to specify the order in which styles should be applied."
 
-(defstruct style-set
-  (styles (make-hash-table :test #'equal) :type hash-table) ; :documentation "Hash table mapping property symbols to style instances.")
-  (order nil :type list)) ; :documentation "Optional list specifying the order of styles application."))
 
 (defmethod styles-list ((set style-set))
   "Return the styles of the given style set as a plist, with keys sorted alphabetically."
   (let ((l nil) (keys 'nil))
     ;; Collect all keys from the hash table into keys list
     (maphash (lambda (k v) (declare (ignore v)) (push k keys))
-      (style-set-styles set))
+             (style-set-styles set))
     ;; Sort the keys alphabetically
     (setq keys
-      (sort keys
-        (lambda (a b) (string< (symbol-name a) (symbol-name b)))))
+          (sort keys
+                (lambda (a b) (string< (symbol-name a) (symbol-name b)))))
     ;; Now process each key in sorted order
     (dolist (k keys)
       (let ((v (gethash k (style-set-styles set))))
@@ -86,14 +87,14 @@ Examples:
   (declare (type list styles))
   (let ((parsed-styles nil) (styles (flatten styles)))
     (loop while styles
-      do (cond
-           ((listp (car styles))
-             (setf parsed-styles
-               (nconc (apply #'parse-styles (pop styles))
-                 parsed-styles)))
-           ((style-p (car styles)) (push (pop styles) parsed-styles))
-           ((symbolp (car styles))
-             (push (make-style (pop styles) (pop styles)) parsed-styles))))
+          do (cond
+               ((listp (car styles))
+                (setf parsed-styles
+                      (nconc (apply #'parse-styles (pop styles))
+                             parsed-styles)))
+               ((style-p (car styles)) (push (pop styles) parsed-styles))
+               ((symbolp (car styles))
+                (push (make-style (pop styles) (pop styles)) parsed-styles))))
     (nreverse parsed-styles)))
 
 (defmethod new ((class (eql 'style-set)) &key (styles nil))
@@ -112,7 +113,7 @@ Example:
   (let ((set (make-style-set)))
     (when styles
       (loop for p in (parse-styles styles)
-        do (setf (style-of set (tuple-prop p)) p)))
+            do (setf (style-of set (tuple-prop p)) p)))
     set))
 
 (defun default-style-set ()
@@ -132,17 +133,17 @@ Example:
 This is used to determine which styles need to be applied around the content."
   (let ((decorator-styles nil))
     (maphash
-      (lambda (k v)
-        (declare (ignore v))
-        (if (and (style-group-key k)
-              (not (member (style-group-key k) decorator-styles))
-              (not
-                (eql (apply-after (style-group-key k) 'nil)
-                  :non-decorating)))
-          (push (style-group-key k) decorator-styles)
-          (if (not (eql (apply-after k 'nil) :non-decorating))
-            (push k decorator-styles))))
-      (style-set-styles set))
+     (lambda (k v)
+       (declare (ignore v))
+       (if (and (style-group-key k)
+                (not (member (style-group-key k) decorator-styles))
+                (not
+                 (eql (apply-after (style-group-key k) 'nil)
+                      :non-decorating)))
+           (push (style-group-key k) decorator-styles)
+           (if (not (eql (apply-after k 'nil) :non-decorating))
+               (push k decorator-styles))))
+     (style-set-styles set))
     decorator-styles))
 
 (defmethod ordered-around-styles ((set style-set))
@@ -166,19 +167,19 @@ Example:
   (setf (value-of my-style-set 'bg-color) :red)
   (value-of my-style-set 'bg-color) ; => :red"
   (if (null value)
-    (when (style-of set property) (remhash property (style-set-styles set)))
-    (let ((s (style-of set property)))
-      (when s
-        (unless (valid-style-value-p (style-property s) value)
-          (error "Invalid value: ~a for ~a" value s)))
-      (if s
-        (setf (value-value (style-val s)) value)
-        (setf (gethash property (style-set-styles set))
-          (make-style property value)))))
+      (when (style-of set property) (remhash property (style-set-styles set)))
+      (let ((s (style-of set property)))
+        (when s
+          (unless (valid-style-value-p (style-property s) value)
+            (error "Invalid value: ~a for ~a" value s)))
+        (if s
+            (setf (value-value (style-val s)) value)
+            (setf (gethash property (style-set-styles set))
+                  (make-style property value)))))
   value)
 
 (defmethod (setf style-of)
-  (value (set style-set) (property symbol) &optional args)
+    (value (set style-set) (property symbol) &optional args)
   "Set the style instance for the given property in the given style set.
 If the property is a group style, the sub-styles are also set.
 
@@ -197,17 +198,17 @@ Example:
     :bold t)) ; => #<STYLE :BG-COLOR :RED :FG-COLOR :WHITE :BOLD T>"
   (declare (ignore args))
   (if (group-styles property)
-    (let* ((inst (make-style property value)) (subs (style-sub-styles inst)))
-      (dolist (s subs) (setf (style-of set (tuple-prop s)) s)))
-    (setf (gethash property (style-set-styles set)) value)))
+      (let* ((inst (make-style property value)) (subs (style-sub-styles inst)))
+        (dolist (s subs) (setf (style-of set (tuple-prop s)) s)))
+      (setf (gethash property (style-set-styles set)) value)))
 
 (defmethod (setf style-of)
-  (values (set style-set) (properties list) &optional args)
+    (values (set style-set) (properties list) &optional args)
   "Set multiple styles in the given style set."
   (declare (ignore args))
   (loop for property in properties
-    for value in values
-    do (setf (style-of set property) value)))
+        for value in values
+        do (setf (style-of set property) value)))
 
 (defmethod merge-styles! ((set style-set) (other style-set))
   "Merge the styles from another style set into this one."
@@ -239,49 +240,49 @@ Example:
   "Return a new style set with the foreground and background colors inverted."
   (invert-colors! (copy set)))
 
-(defmethod make-terminal-style-from-style-set ((style-set style-set))
-  "Create a terminal style from a style set."
-  (let ((ts (make-terminal-style)))
-    (setf (terminal-style-bold ts) (value-of style-set :bold))
-    (setf (terminal-style-italic ts) (value-of style-set :italic))
-    (setf (terminal-style-strike ts) (value-of style-set :strike))
-    (setf (terminal-style-underline ts) (value-of style-set :underline))
-    (setf (terminal-style-blink ts) (value-of style-set :blink))
-    (setf (terminal-style-inverse ts) (value-of style-set :inverse))
-    (setf (terminal-style-invisible ts) (value-of style-set :invisible))
-    (when (style-of style-set :fg-color)
-      (setf (terminal-style-fg-color ts)
-        (new-fg-color (value-of style-set :fg-color))))
-    (when (style-of style-set :bg-color)
-      (setf (terminal-style-bg-color ts)
-        (new-bg-color (value-of style-set :bg-color))))
-    ts))
+;; (defmethod make-terminal-style-from-style-set ((style-set style-set))
+;;   "Create a terminal style from a style set."
+;;   (let ((ts (make-terminal-style)))
+;;     (setf (terminal-style-bold ts) (value-of style-set :bold))
+;;     (setf (terminal-style-italic ts) (value-of style-set :italic))
+;;     (setf (terminal-style-strike ts) (value-of style-set :strike))
+;;     (setf (terminal-style-underline ts) (value-of style-set :underline))
+;;     (setf (terminal-style-blink ts) (value-of style-set :blink))
+;;     (setf (terminal-style-inverse ts) (value-of style-set :inverse))
+;;     (setf (terminal-style-invisible ts) (value-of style-set :invisible))
+;;     (when (style-of style-set :fg-color)
+;;       (setf (terminal-style-fg-color ts)
+;;             (new-fg-color (value-of style-set :fg-color))))
+;;     (when (style-of style-set :bg-color)
+;;       (setf (terminal-style-bg-color ts)
+;;             (new-bg-color (value-of style-set :bg-color))))
+;;     ts))
 
 (defgeneric style-term-element! (styles ts)
   (:documentation "Applies a style to a terminal element.
 This mutates the terminal-style object associated with the element."))
 
-(defmethod style-term-element! ((styles style-set) (ts terminal-style))
-  "Apply styles from the style-set to the terminal-style object."
-  (setf (terminal-style-bold ts) (value-of styles :bold))
-  (setf (terminal-style-italic ts) (value-of styles :italic))
-  (setf (terminal-style-strike ts) (value-of styles :strike))
-  (setf (terminal-style-underline ts) (value-of styles :underline))
-  (setf (terminal-style-blink ts) (value-of styles :blink))
-  (setf (terminal-style-inverse ts) (value-of styles :inverse))
-  (setf (terminal-style-invisible ts) (value-of styles :invisible))
-  (when (style-of styles :fg-color)
-    (setf (terminal-style-fg-color ts)
-      (new-fg-color (value-of styles :fg-color))))
-  (when (style-of styles :bg-color)
-    (setf (terminal-style-bg-color ts)
-      (new-bg-color (value-of styles :bg-color))))
-  ts)
+;; (defmethod style-term-element! ((styles style-set) (ts terminal-style))
+;;   "Apply styles from the style-set to the terminal-style object."
+;;   (setf (terminal-style-bold ts) (value-of styles :bold))
+;;   (setf (terminal-style-italic ts) (value-of styles :italic))
+;;   (setf (terminal-style-strike ts) (value-of styles :strike))
+;;   (setf (terminal-style-underline ts) (value-of styles :underline))
+;;   (setf (terminal-style-blink ts) (value-of styles :blink))
+;;   (setf (terminal-style-inverse ts) (value-of styles :inverse))
+;;   (setf (terminal-style-invisible ts) (value-of styles :invisible))
+;;   (when (style-of styles :fg-color)
+;;     (setf (terminal-style-fg-color ts)
+;;           (new-fg-color (value-of styles :fg-color))))
+;;   (when (style-of styles :bg-color)
+;;     (setf (terminal-style-bg-color ts)
+;;           (new-bg-color (value-of styles :bg-color))))
+;;   ts)
 
-(defmethod style-term-element! ((styles style-set) (ts t))
-  "Apply styles from the style-set to a new terminal-style object."
-  (style-term-element! styles (make-terminal-style)))
+;; (defmethod style-term-element! ((styles style-set) (ts t))
+;;   "Apply styles from the style-set to a new terminal-style object."
+;;   (style-term-element! styles (make-terminal-style)))
 
-(defmethod style-term-element! ((styles style-set) (ts terminal-cell))
-  "Apply styles from the style-set to the terminal-style of a terminal-cell."
-  (style-term-element! styles (terminal-cell-term-style ts)))
+;; (defmethod style-term-element! ((styles style-set) (ts terminal-cell))
+;;   "Apply styles from the style-set to the terminal-style of a terminal-cell."
+;;   (style-term-element! styles (terminal-cell-term-style ts)))

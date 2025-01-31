@@ -1,3 +1,6 @@
+(uiop:define-package :cl-styles-tests
+  (:use :common-lisp :cl-styles)
+  )
 (uiop:define-package :cl-styles.tests.api
   (:use :common-lisp :cl-styles.api)
   (:export :run-tests))

@@ -1,11 +1,11 @@
-(uiop:define-package :uncharming-tui.styles.styled-strings
-  (:nicknames :ut.styles.ss) (:use :common-lisp)
+(uiop:define-package :cl-styles.styled-strings
+  (:nicknames :styles.ss) (:use :common-lisp)
   (:import-from :str :upcase :split :join :trim :fit :concat
     :numericp)
   (:export :styled-string :parse-string :parse-style-string
     :make-styled-string))
 
-(in-package :uncharming-tui.styles.styled-strings)
+(in-package :cl-styles.styled-strings)
 
 ;; ====================
 ;; = Styled strings   =

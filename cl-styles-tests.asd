@@ -8,6 +8,7 @@
   :version "0.1.0"
   :depends-on (cl-styles fiveam)
 
+  :serial t
   :components ((:file "tests/test-api")
                (:file "tests/test-macros")
                (:file "tests/test-properties")
