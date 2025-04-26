@@ -1,6 +1,7 @@
 (uiop:define-package ::cl-styles.rule (:nicknames :styles.rule)
                      (:use :common-lisp)
-                     (:import-from :cl-styles.api :style-rule :rule-selector)
+                     (:import-from :cl-styles.api :style-rule :rule-selector
+                      :rule-styles)
                      (:import-from :cl-styles.util :hash-table-keys)
                      (:import-from :cl-styles.style-set :style-set :styles-list
                       :new :style-set-styles :style-of :merge-styles!)

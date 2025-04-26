@@ -4,7 +4,7 @@ all:
 
 test:
 	@echo "Running tests..."
-	@# Add test commands here
+	@ros --quiet run -- --load ~/.sbclrc --load ~/.cl-repl --load run.lisp
 
 clean:
 	@echo "Cleaning up..."
