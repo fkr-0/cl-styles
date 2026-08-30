@@ -28,7 +28,7 @@ parse_docstring() {
 
 exe_tests() {
   # run tests
-  ros run -- --load ~/.sbclrc --load run-tests.lisp --non-interactive
+  ros run -- --load ~/.sbclrc --load run-tests-clpm.lisp --non-interactive
 
 }
 
@@ -44,7 +44,7 @@ exe_run() {
 
 exe_format() {
   # format whole system
-  ros run --load ~/.sbclrc --load format.lisp -- --non-interactive
+  ros run --load ~/.sbclrc --load ./prof.lisp/src/format.lisp -- --non-interactive
 }
 
 exe_clpm_slynk() {
@@ -52,25 +52,23 @@ exe_clpm_slynk() {
 
   clpm bundle exec --with-client sbcl -- --noinform --load run_clpm_slynk.lisp
 }
-exe_cov() {
-  ros --quiet run -- --load ~/.sbclrc --load ~/.cl-repl --load coverage.lisp
-}
 exe_ros_clpm() {
   ros --quiet run -- --load ~/.sbclrc --load ~/.cl-repl --load run_clpm.lisp
-}
-exe_ros_slynk() {
-  # run faketerm example
-  ros --quiet run -- --noinform --load ~/.sbclrc --load run_clpm_slynk.lisp
-}
-exe_ros_faketerm() {
-  # run faketerm example
-  ros run -- --load ~/.sbclrc --load ~/.cl-repl --load run_clpm_slynk_faketerm.lisp
 }
 
 exe_clpm() {
   # format whole system
 
   clpm bundle exec --with-client sbcl -- --noinform --load run_clpm.lisp
+}
+
+exe_remove_fasl() {
+  find . -name "*.fasl" -delete
+}
+
+exe_cov_input() {
+  # run coverage for cl-inputs
+  clpm bundle exec --with-client sbcl -- --noinform --load coverage.lisp
 }
 
 if [[ $# -eq 0 ]]; then

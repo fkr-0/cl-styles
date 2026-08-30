@@ -1,163 +1,178 @@
-;;; ─── cl-styles/selector.lisp ─────────────────────────────────────────
-(uiop:define-package :cl-styles.selector (:use :common-lisp)
-  (:nicknames :cl-styles.styles.selector)
-  (:import-from :cl-styles.api :stylable-id :selects :selector :stylable :classes
-    :parents-of)
-  (:import-from :cl-styles.util :=?)
-  (:export :selector :class-selector :id-selector
-    :cl-class-selector :combined-selector
-    :parent-selector-of :child-selector-of :cl-cls>
-    :hierarchical-selector :complex-selector :cls> :id>
-    :cl-class> :and> :parent-child> :selection-specificity))
 (in-package :cl-styles.selector)
 
-(defgeneric selects (selector target)
-  (:documentation
-    "Return T if the given selector selects the given target, NIL otherwise."))
+;; Simple selector constructors (S-expr DSL)
+(defun type> (kw) (list :type kw))
+(defun id> (id) (list :id id))
+(defun cls> (&rest names) (cons :class names))
+(defun attr> (key &optional value) (list :attr key value))
+(defun state> (&rest flags) (cons :state flags))
+(defun first-child () (list :first-child))
+(defun last-child ()  (list :last-child))
+(defun nth-child (n) (list :nth-child n))
 
-(defmethod print-object ((selector selector) stream)
-  "Print a representation of the selector."
-  (format stream "<~a:>" (type-of selector)))
+;; Combinators
+(defun sel-and (&rest xs) (cons :and xs))
+(defun sel-or  (&rest xs) (cons :or xs))
+(defun sel-not (x)        (list :not x))
+(defun descendant> (a b) (list :desc a b))
+(defun child> (a b)      (list :child a b))
+(defun has (x)           (list :has x))
 
-(defclass class-selector (selector)
-  ((class-name :initarg :class-name
-     :accessor class-name-of
-     :documentation "The name of the class to select."))
-  (:documentation "Selects elements based on class name."))
+;; Specificity: very simplified (ids > classes/attrs/states > type)
+(define-condition invalid-selector (error)
+  ((selector :initarg :selector :reader invalid-selector-selector)
+   (reason :initarg :reason :reader invalid-selector-reason)
+   (path :initarg :path :reader invalid-selector-path :initform nil))
+  (:report (lambda (condition stream)
+             (format stream "Invalid selector ~S at ~S: ~A"
+                     (invalid-selector-selector condition)
+                     (invalid-selector-path condition)
+                     (invalid-selector-reason condition)))))
 
-(defmethod print-object ((selector class-selector) stream)
-  "Print a representation of the class-selector."
-  (format stream "<~a: ~a>" (type-of selector) (class-name-of selector)))
+(defun validate-selector (selector &optional (path nil))
+  "Validate SELECTOR shape recursively and return it, or signal INVALID-SELECTOR."
+  (labels ((fail (reason &optional (value selector) (at path))
+             (error 'invalid-selector :selector value :reason reason :path at))
+           (walk (form at)
+             (unless (consp form)
+               (fail :selector-must-be-a-list form at))
+             (case (car form)
+               ((:type :id)
+                (unless (and (= (length form) 2) (second form))
+                  (fail :expected-one-non-null-argument form at)))
+               ((:class :state)
+                (unless (and (cdr form) (every #'identity (cdr form)))
+                  (fail :expected-one-or-more-non-null-arguments form at)))
+               (:attr
+                (unless (and (member (length form) '(2 3)) (second form))
+                  (fail :expected-attribute-key-and-optional-value form at)))
+               ((:first-child :last-child)
+                (unless (= (length form) 1)
+                  (fail :expected-no-arguments form at)))
+               (:nth-child
+                (unless (and (= (length form) 2)
+                             (integerp (second form))
+                             (not (minusp (second form))))
+                  (fail :expected-non-negative-integer form at)))
+               ((:and :or)
+                (unless (cdr form)
+                  (fail :expected-one-or-more-selectors form at))
+                (loop for child in (cdr form)
+                      for index from 0
+                      do (walk child (append at (list index)))))
+               ((:not :has)
+                (unless (= (length form) 2)
+                  (fail :expected-one-selector form at))
+                (walk (second form) (append at '(0))))
+               ((:child :desc)
+                (unless (= (length form) 3)
+                  (fail :expected-two-selectors form at))
+                (walk (second form) (append at '(0)))
+                (walk (third form) (append at '(1))))
+               (otherwise
+                (fail :unknown-selector-operator form at)))
+             form))
+    (walk selector path)
+    selector))
 
-(defclass id-selector (selector)
-  ((id :initarg :id
-     :accessor id-of
-     :documentation "The ID of the element to select."))
-  (:documentation "Selects elements based on ID."))
+(defun selector-specificity (sel)
+  "Return the deterministic CSS-like specificity triple (ID CLASS TYPE) for SEL."
+  (validate-selector sel)
+  (labels ((add (x y)
+             (list (+ (first x) (first y))
+                   (+ (second x) (second y))
+                   (+ (third x) (third y))))
+           (greater (a b)
+             (if (or (> (first a) (first b))
+                     (and (= (first a) (first b)) (> (second a) (second b)))
+                     (and (= (first a) (first b))
+                          (= (second a) (second b))
+                          (> (third a) (third b))))
+                 a b))
+           (score (s)
+             (case (car s)
+               (:id '(1 0 0))
+               (:class (list 0 (length (cdr s)) 0))
+               ((:attr :first-child :last-child :nth-child) '(0 1 0))
+               (:state (list 0 (length (cdr s)) 0))
+               (:type '(0 0 1))
+               (:and (reduce #'add (mapcar #'score (cdr s)) :initial-value '(0 0 0)))
+               (:or (reduce #'greater (mapcar #'score (cdr s)) :initial-value '(0 0 0)))
+               ((:not :has) (score (second s)))
+               ((:child :desc) (add (score (second s)) (score (third s)))))))
+    (score sel)))
 
-(defmethod print-object ((selector id-selector) stream)
-  "Print a representation of the id-selector."
-  (format stream "<~a: ~a>" (type-of selector) (id-of selector)))
+(defun compile-selector (selector)
+  "Validate and return the selector S-expression used by the matcher."
+  (validate-selector selector)
+  selector)
+ ;; identity for now
 
-(defclass cl-class-selector (selector)
-  ((cl-class-name :initarg :cl-class-name
-     :accessor cl-class-name-of
-     :documentation "The name of the Common Lisp class to select."))
-  (:documentation "Selects elements based on Common Lisp class name."))
+(defun %in-list-p (x seq)
+  (when seq (some (lambda (y) (or (eql x y)
+                                  (and (symbolp x) (symbolp y) (string= (symbol-name x) (symbol-name y)))
+                                  (and (stringp x) (stringp y) (string= x y)))) seq)))
+(defgeneric selector-value-eql (a b)
+  (:documentation "Return true if selector values A and B are equal.")
+  (:method ((a null) (b null)) t)
+  (:method ((a null) b) nil)
+  (:method (a (b null)) nil)
+  (:method ((a symbol) (b symbol)) (string= (symbol-name a) (symbol-name b)))
+  (:method ((a string) (b string)) (string= a b))
+  (:method ((a string) (b symbol)) (string= (string-upcase a) (symbol-name b)))
+  (:method ((a symbol) (b string)) (string= (symbol-name a) (string-upcase b)))
+  (:method ((a number) (b number)) (eql a b))
+  (:method ((a list) (b list))
+    (and (= (length a) (length b))
+         (every #'(lambda (x y) (selector-value-eql x y)) a b)))
+  (:method (a b) nil))
 
-(defmethod print-object ((selector cl-class-selector) stream)
-  "Print a representation of the cl-class-selector."
-  (format stream "<~a: ~a>" (type-of selector) (cl-class-name-of selector)))
+(defun %match-simple (s obj)
+  (case (car s)
+    (:type  (selector-value-eql (second s)
+                                (stylable-type obj)))
+    (:id    (selector-value-eql (second s)
+                                (stylable-id obj)))
+                                        ; (let ((sid (stylable-id obj))) (or (eql sid (second s)) (and (stringp sid) (string= sid (second s))))))
+    (:class (let ((classes (stylable-classes obj))) (every (lambda (c) (%in-list-p c classes)) (cdr s))))
+    (:attr  (destructuring-bind (k v) (list (second s) (third s))
+              (let* ((attrs (stylable-attributes obj))
+                     (got (if (hash-table-p attrs)
+                              (gethash k attrs)
+                              (and (listp attrs) (getf attrs k)))))
+                (if (null v) got (equal got v)))))
+    (:state (let ((st (stylable-state obj))) (every (lambda (f) (%in-list-p f st)) (cdr s))))
+    (:first-child (let ((p (stylable-parent obj)))
+                    (and p (= (stylable-index obj) 0))))
+    (:last-child  (let ((p (stylable-parent obj)))
+                    (if p
+                        (let ((kids (stylable-children p)))
+                          (= (stylable-index obj) (1- (length kids))))
+                        nil)))
+    (:nth-child (let ((p (stylable-parent obj)))
+                  (and p (= (stylable-index obj) (second s)))))
+    (t nil)))
 
-(defclass combined-selector (selector)
-  ((sub-selectors :initarg :sub-selectors
-     :accessor sub-selectors-of
-     :documentation "A list of selectors to be combined (logical AND)."))
-  (:documentation "Combines multiple selectors logically."))
-
-(defclass hierarchical-selector (selector)
-  ((parent-selector :initarg :parent-selector
-     :accessor parent-selector-of
-     :documentation "The parent selector in the relationship.")
-    (child-selector :initarg :child-selector
-      :accessor child-selector-of
-      :documentation "The child selector in the relationship."))
-  (:documentation
-    "Represents a hierarchical relationship between selectors (parent-child)."))
-
-(defclass complex-selector (selector)
-  ((child-selector :initarg :child-selector
-     :accessor child-selector-of
-     :documentation "The child selector that further specifies the target.")
-    (relationship-type :initarg :relationship-type
-      :accessor relationship-type-of
-      :documentation "The type of relationship (e.g., parent, ancestor)."))
-  (:documentation
-    "Represents a complex selector with a hierarchical relationship."))
-
-(defmacro cls> (name)
-  "Create a class-selector for the given class name."
-  `(make-instance 'class-selector :class-name ,name))
-
-(defmacro id> (name)
-  "Create an id-selector for the given ID."
-  `(make-instance 'id-selector :id ,name))
-
-(defmacro cl-cls> (name)
-  "Create a cl-class-selector for the given Common Lisp class name."
-  `(make-instance 'cl-class-selector :cl-class-name ,name))
-
-(defmacro and> (&rest selectors)
-  "Create a combined-selector that logically ANDs the given selectors."
-  `(make-instance 'combined-selector :sub-selectors (list ,@selectors)))
-
-(defmacro parent-child> (parent child)
-  "Create a hierarchical-selector representing a parent-child relationship."
-  `(make-instance 'hierarchical-selector
-     :parent-selector ,parent
-     :child-selector ,child))
-
-(defmethod (setf parent-selector-of) :before (new-value (selector hierarchical-selector))
-  "Set the parent selector of a hierarchical-selector."
-  (unless (typep new-value 'selector)
-    (error "Parent selector must be a selector.")))
-
-(defmethod (setf child-selector-of) :before (new-value (selector hierarchical-selector))
-  "Set the child selector of a hierarchical-selector."
-  (unless (typep new-value 'selector)
-    (error "Child selector must be a selector.")))
-
-(defmethod selects (selector  (target null) )nil)
-
-(defmethod selects ((selector class-selector) (target stylable))
-  "Return T if the target has the class specified by the selector."
-  (member (class-name-of selector) (classes target) :test #'string-equal))
-
-(defmethod selects ((selector id-selector) (target stylable))
-  "Return T if the target has the ID specified by the selector."
-  (string-equal (id-of selector) (stylable-id target)))
-
-(defmethod selects ((selector cl-class-selector) (target stylable))
-  "Return T if the target is of the type specified by the selector."
-  (typep target (find-class (cl-class-name-of selector) nil)))
-
-(defmethod selects ((selector combined-selector) (target stylable))
-  "Return T if all sub-selectors match the target."
-  (every (lambda (sub-sel) (selects sub-sel target))
-    (sub-selectors-of selector)))
-
-(defmethod selects ((selector hierarchical-selector) (target stylable))
-  "Return T if the parent and child selectors match the target."
-  (and (selects (parent-selector-of selector) (first (parents-of target)))
-    (selects (child-selector-of selector) target)))
-
-(defmethod selection-specificity ((selector selector))
-  "Return a number representing the specificity of the selector."
-  (etypecase selector
-    (class-selector 100)
-    (id-selector 1000)
-    (cl-class-selector 1)
-    (combined-selector
-      (+ 1000
-        (reduce #'+
-          (mapcar #'selection-specificity (sub-selectors-of selector))
-          :initial-value 0)))
-    (hierarchical-selector
-      (+ 1000 (selection-specificity (parent-selector-of selector))
-        (selection-specificity (child-selector-of selector))))))
-
-(defmethod =? ((selector selector) (other selector))
-  "Return T if the two selectors are equal, NIL otherwise."
-  (and (typep other (class-of selector))
-    (etypecase selector
-      (class-selector
-        (string= (class-name-of selector) (class-name-of other)))
-      (id-selector (string= (id-of selector) (id-of other)))
-      (cl-class-selector
-        (string= (cl-class-name-of selector) (cl-class-name-of other)))
-      (combined-selector
-        (every #'=? (sub-selectors-of selector) (sub-selectors-of other)))
-      (hierarchical-selector
-        (and (=? (parent-selector-of selector) (parent-selector-of other))
-          (=? (child-selector-of selector) (child-selector-of other)))))))
-;; End of selector.lisp
+(defun match-selector-p (sel obj)
+  (labels ((rec (s n)
+             (case (car s)
+               ((:type :id :class :attr :state :first-child :last-child :nth-child) (%match-simple s n))
+               (:and (every (lambda (x) (rec x n)) (cdr s)))
+               (:or  (some  (lambda (x) (rec x n)) (cdr s)))
+               (:not (not (rec (second s) n)))
+               (:child (and (rec (second s) (stylable-parent n))
+                            (rec (third  s) n)))
+               (:desc  (labels ((up (m)
+                                  (cond
+                                    ((null m) nil)
+                                    ((rec (second s) m) (rec (third s) n))
+                                    (t (up (stylable-parent m))))))
+                         (up (stylable-parent n))))
+               (:has  (some (lambda (k)
+                              (labels ((down (x)
+                                         (or (rec (second s) x)
+                                             (some #'down (stylable-children x)))))
+                                (down k)))
+                            (stylable-children n)))
+               (t nil))))
+    (rec sel obj)))
