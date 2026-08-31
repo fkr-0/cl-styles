@@ -23,15 +23,19 @@
   candidate)
 
 (defun make-rule (&key selector declarations specificity)
-  "Construct a validated style rule. Static selector/property errors fail here."
+  "Construct a validated style rule with TUI compatibility normalized at ingress."
   (let* ((compiled (compile-selector selector))
-         (expected (selector-specificity compiled)))
+         (expected (selector-specificity compiled))
+         (normalized-declarations
+           (cl-styles.adapters:normalize-tui-declarations declarations)))
     (when (and specificity (not (equal specificity expected)))
       (error 'invalid-rule
              :rule (list selector declarations specificity)
              :reason :specificity-mismatch))
-    (cl-styles.properties:ensure-static-declarations declarations)
-    (%make-rule :selector compiled :declarations declarations :specificity expected)))
+    (cl-styles.properties:ensure-static-declarations normalized-declarations)
+    (%make-rule :selector compiled
+                :declarations normalized-declarations
+                :specificity expected)))
 
 
 ;; (defmacro defrule (selector &body declarations)

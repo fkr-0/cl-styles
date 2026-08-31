@@ -88,7 +88,9 @@
   (:use :cl)
   (:import-from :cl-styles.properties
                 #:normalize-declarations)
-  (:export #:normalize-tui-style-plist))
+  (:import-from :cl-styles.tokens
+                #:rgb)
+  (:export #:normalize-tui-declarations #:normalize-tui-style-plist))
 
 (uiop:define-package :cl-styles.api
   (:use :cl :cl-styles.protocols :cl-styles.tokens :cl-styles.selector

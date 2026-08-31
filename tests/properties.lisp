@@ -57,6 +57,44 @@
     (is (null (getf ens :fg-color)))
     (is (null (getf ens :bg-color)))))
 
+(test tui-declaration-adapter-normalizes-legacy-border-forms
+  "ElmTUI compatibility spellings become strict declarations at the adapter boundary."
+  (let ((boxed (cl-styles.adapters:normalize-tui-declarations
+                 '(:box :single :width 10 :fg-color :white)))
+        (ascii (cl-styles.adapters:normalize-tui-declarations
+                '(:box :ascii :height 4)))
+        (boolean-border (cl-styles.adapters:normalize-tui-declarations
+                         '(:border t :border-style :single))))
+    (is (= 1 (getf boxed :border)))
+    (is (eq :solid (getf boxed :border-style)))
+    (is (= 10 (getf boxed :width)))
+    (is (eq :white (getf boxed :color)))
+    (is (null (member :box boxed :test #'eql)))
+    (is (eq :ascii (getf ascii :border-style)))
+    (is (= 1 (getf boolean-border :border)))
+    (is (eq :solid (getf boolean-border :border-style)))
+    (is-true (cl-styles.properties:ensure-declarations boxed))
+    (is-true (cl-styles.properties:ensure-declarations ascii))
+    (is-true (cl-styles.properties:ensure-declarations boolean-border))))
+
+(test tui-declaration-adapter-normalizes-legacy-layout-and-color-forms
+  (let ((normalized
+          (cl-styles.adapters:normalize-tui-declarations
+           '(:direction :row :spacing 2 :justify :center
+             :fg-color (12 34 56) :bg-color (65 43 21)
+             :bold t :underline nil))))
+    (is (eq :row (getf normalized :flex-direction)))
+    (is (= 2 (getf normalized :gap)))
+    (is (eq :center (getf normalized :justify-content)))
+    (is (equal '(:rgb 12 34 56) (getf normalized :color)))
+    (is (equal '(:rgb 65 43 21) (getf normalized :background-color)))
+    (is (member :bold (getf normalized :attributes)))
+    (is (not (member :underline (getf normalized :attributes))))
+    (is (null (member :direction normalized :test #'eql)))
+    (is (null (member :spacing normalized :test #'eql)))
+    (is (null (member :bold normalized :test #'eql)))
+    (is-true (cl-styles.properties:ensure-declarations normalized))))
+
 (test shorthands-flex-and-gap
   (let* ((decl '(:flex (2 3 4) :gap (1 2)))
          (exp  (cl-styles.rule:expand-shorthands decl)))

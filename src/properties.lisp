@@ -327,7 +327,8 @@ Variable references are type-checked after resolution; a literal fallback is che
 (defproperty :border-left-width :type :number)
 
 ;; border style and color
-(defproperty :border-style :type :keyword :enum (:none :solid :dashed :dotted :double))
+(defproperty :border-style :type :keyword :enum (:none :solid :ascii :dashed :dotted :double)
+  :synonyms (:single :solid))
 (defproperty :border-top-style :type :keyword :enum (:none :solid :dashed :dotted :double))
 (defproperty :border-right-style :type :keyword :enum (:none :solid :dashed :dotted :double))
 (defproperty :border-bottom-style :type :keyword :enum (:none :solid :dashed :dotted :double))
