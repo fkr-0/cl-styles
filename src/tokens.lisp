@@ -4,7 +4,14 @@
 (defun rgb  (r g b)  (list :rgb r g b))
 (defun rgba (r g b a) (list :rgba r g b a))
 (defun hsl  (h s l)  (list :hsl h s l))
-(defun color-p (x) (and (consp x) (member (first x) '(:rgb :rgba :hsl))))
+(defun color-p (x)
+  "Accept normalized CSS colors and the ElmTUI 256-color palette token."
+  (and (consp x)
+       (or (member (first x) '(:rgb :rgba :hsl))
+           (and (eq (first x) :256)
+                (= (length x) 2)
+                (integerp (second x))
+                (<= 0 (second x) 255)))))
 
 ;; Lengths
 (defun px (n)       (list :px n))
