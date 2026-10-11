@@ -48,6 +48,17 @@
     (is (= 4 (getf ens :scroll-x)))
     (is (= 5 (getf ens :scroll-y)))))
 
+(test tui-256-color-palette-contract
+  "Valid 0..255 palette colors flow through canonical color aliases."
+  (let ((styles (cl-styles.properties:ensure-declarations
+                  '(:fg-color (:rgb 12 34 56) :bg-color (:256 77)))))
+    (is (equal (getf styles :color) '(:rgb 12 34 56)))
+    (is (equal (getf styles :background-color) '(:256 77))))
+  (dolist (invalid '((:256 -1) (:256 256) (:256 :bad) (:256)))
+    (signals cl-styles.properties:style-contract-violation
+      (cl-styles.properties:ensure-declarations
+        (list :background-color invalid)))))
+
 (test tui-color-aliases-normalize-to-canonical-properties
   "ElmTUI color spellings normalize without weakening the style contract."
   (let ((ens (cl-styles.properties:ensure-declarations
