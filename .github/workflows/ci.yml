@@ -1,0 +1,162 @@
+# Provisional: gate is advisory until the first verified main-branch run and review pass.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      LISP: sbcl-bin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SBCL and ASDF dependencies
+        uses: 40ants/setup-lisp@v4
+        with:
+          asdf-system: cl-styles
+
+      - name: Require native SB-COVER LCOV support
+        shell: lispsh -eo pipefail {0}
+        run: |
+          ros run -- --noinform --non-interactive \
+            --eval '(require :sb-cover)' \
+            --eval '(unless (fboundp (find-symbol "LCOV-REPORT" "SB-COVER")) (error "SBCL 2.6.0+ required"))'
+
+      - name: Compile and execute FiveAM tests
+        shell: lispsh -eo pipefail {0}
+        run: |
+          ros run -- --noinform --non-interactive \
+            --eval '(require :asdf)' \
+            --eval '(push #p"./" asdf:*central-registry*)' \
+            --eval '(ql:quickload :fiveam)' \
+            --eval '(asdf:compile-system "cl-styles" :force t)' \
+            --eval '(asdf:test-system "cl-styles")'
+
+      - name: Measure and enforce source executable-line coverage
+        shell: lispsh -eo pipefail {0}
+        run: |
+          ros run -- --noinform --non-interactive --load coverage.lisp
+
+      - name: Prepare HTML report for GitHub Pages
+        run: cp coverage/cover-index.html coverage/index.html
+
+      - name: Upload coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sb-cover
+          path: |
+            coverage/cover-index.html
+            coverage/index.html
+            coverage/*.html
+            coverage/*.info
+            coverage/*.json
+          if-no-files-found: error
+          retention-days: 30
+
+  clpm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SBCL
+        uses: 40ants/setup-lisp@v4
+        with:
+          asdf-system: cl-styles
+
+      - name: Download and verify signed CLPM binary release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=0.4.1
+          archive="clpm-${version}-linux-amd64.tar.gz"
+          curl -fsSLO "https://files.clpm.dev/clpm/${archive}"
+          curl -fsSLO "https://files.clpm.dev/clpm/clpm-${version}.DIGESTS.asc"
+          gpg --batch --keyserver hkps://keyserver.ubuntu.com \
+            --recv-keys 10327DE761AB977333B1AD7629932AC49F3044CE
+          gpg --batch --decrypt "clpm-${version}.DIGESTS.asc" > clpm.DIGESTS
+          grep -F "${archive}" clpm.DIGESTS | sha512sum --check -
+          tar -xzf "${archive}"
+          (cd "clpm-${version}-linux-amd64" &&
+            INSTALL_ROOT="$HOME/.local" sh install.sh)
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install portable CLPM bundle and rerun tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=clpmfile
+          if test -f clpmfile.release; then manifest=clpmfile.release; fi
+          clpm bundle -f "$manifest" install -y
+          clpm bundle -f "$manifest" exec --with-client sbcl -- \
+            --dynamic-space-size 4096 --noinform --non-interactive \
+            --eval '(require :asdf)' \
+            --eval '(push #p"./" asdf:*central-registry*)' \
+            --eval '(asdf:test-system "cl-styles")'
+
+  publish-coverage:
+    needs: [verify, clpm]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sb-cover
+          path: coverage
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: coverage
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  publish-badge:
+    name: Publish verified percentage endpoint
+    needs: [verify, clpm]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sb-cover
+          path: evidence
+      - name: Publish measured endpoint using gh CLI
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          endpoint="$(find evidence -type f -name endpoint.json -print -quit)"
+          test -n "$endpoint"
+          python3 -m json.tool "$endpoint" > /dev/null
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/coverage-data" > /dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/coverage-data" -f sha="$GITHUB_SHA"
+          fi
+          args=(-f "branch=coverage-data" \
+                -f "message=chore: update verified coverage badge for $GITHUB_SHA" \
+                -f "content=$(base64 -w0 "$endpoint")")
+          previous="$(gh api "repos/$GITHUB_REPOSITORY/contents/coverage.json?ref=coverage-data" --jq .sha 2>/dev/null || true)"
+          if [[ -n "$previous" ]]; then
+            args+=(-f "sha=$previous")
+          fi
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/coverage.json" "${args[@]}"

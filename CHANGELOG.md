@@ -9,6 +9,12 @@ registry publication or separate-repository release.
 
 ### Added
 
+- Added a standalone GitHub Actions CI workflow: SBCL/FiveAM verification with
+  SB-COVER executable-line measurement, a signed-CLPM bundle rerun, and
+  GitHub Pages coverage publication gated on both jobs passing.
+- Added ASDF-native `test-op`, regression cases for keyword conversions and
+  value initialization aliases, and a deterministic extracted-source test
+  target.
 - Revisioned computed-style results plus `explain-style` declaration traces with winner/override, origin, specificity, source order, inheritance, and variable-expansion evidence.
 - Typed `missing-style-variable`, `style-variable-cycle`, and invalid-selector diagnostics, including variable fallbacks.
 - Monotonic `stylesheet-revision` tracking for rule and variable mutations.
@@ -29,3 +35,9 @@ registry publication or separate-repository release.
 ## 0.1.0
 
 - Initial CSS-like selector, rule, stylesheet, token, property, protocol, and cascade engine.
+
+### Fixed
+
+- Repaired stylable protocol fixtures, selector package conflicts, API/core
+  style equality, stylesheet query compatibility, style-set raw values, and
+  public-facade selector macro bindings.
