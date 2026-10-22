@@ -5,13 +5,13 @@ All notable changes to `cl-styles` are recorded here. The library follows semant
 ## Unreleased
 
 Candidate version: **0.2.0**. This remains an in-tree candidate and is not a
-registry publication or separate-repository release.
+registry publication or tagged release; the GitHub source repository exists.
 
 ### Added
 
-- Added a standalone GitHub Actions CI workflow: SBCL/FiveAM verification with
-  SB-COVER executable-line measurement, a signed-CLPM bundle rerun, and
-  GitHub Pages coverage publication gated on both jobs passing.
+- Added a standalone GitHub Actions CI workflow: pinned SBCL 2.6.2 / CLPM 0.4.1, FiveAM verification, fail-closed SB-COVER executable-line measurement, and GitHub Pages/verified coverage badge publication after the verification job.
+- Repaired SB-COVER LCOV compiler-line instrumentation; 218 tests pass and the measured baseline is 60.42% (60% ratchet, 85% target).
+- Added a standalone OCP workflow identity, README CI/coverage badges, and generated-artifact ignore rules.
 - Added ASDF-native `test-op`, regression cases for keyword conversions and
   value initialization aliases, and a deterministic extracted-source test
   target.
