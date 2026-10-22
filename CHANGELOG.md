@@ -9,7 +9,7 @@ registry publication or tagged release; the GitHub source repository exists.
 
 ### Added
 
-- Added a standalone GitHub Actions CI workflow: pinned SBCL 2.6.2 / CLPM 0.4.1, FiveAM verification, fail-closed SB-COVER executable-line measurement, and GitHub Pages/verified coverage badge publication after the verification job.
+- Added a standalone GitHub Actions CI workflow: pinned SBCL 2.6.2 / CLPM 0.4.1, FiveAM verification, fail-closed SB-COVER executable-line measurement, and verified coverage badge publication after the verification job. HTML coverage remains in the CI artifact; Pages deployment is intentionally omitted until the repository enables Pages.
 - Repaired SB-COVER LCOV compiler-line instrumentation; 218 tests pass and the measured baseline is 60.42% (60% ratchet, 85% target).
 - Added a standalone OCP workflow identity, README CI/coverage badges, and generated-artifact ignore rules.
 - Added ASDF-native `test-op`, regression cases for keyword conversions and
