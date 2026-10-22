@@ -1,0 +1,9 @@
+# Generated coverage, compilation and local tool caches
+/coverage/
+.cache/
+__pycache__/
+*.pyc
+*.fasl
+*.o
+*.so
+.DS_Store

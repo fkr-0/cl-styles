@@ -1,12 +1,16 @@
 # cl-styles
 
+[![CI](https://github.com/fkr-0/cl-styles/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fkr-0/cl-styles/actions/workflows/ci.yml)
+[![Measured coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffkr-0%2Fcl-styles%2Fcoverage-data%2Fcoverage.json)](https://github.com/fkr-0/cl-styles/actions/workflows/ci.yml)
+
+Coverage is calculated from instrumented production sources on CI; the badge is published only after a passing main-branch run. The current measured release floor is 60% (SBCL 2.6.2 local measurement: 60.42%); the improvement target is at least 85%.
+
 A CSS-like styling engine for Common Lisp, designed for TUI (Terminal User Interface) applications and other hierarchical object structures. cl-styles provides a flexible, declarative way to style objects using familiar CSS concepts like selectors, rules, inheritance, and variables.
 
 ## Release status
 
 The current in-tree candidate version is **0.2.0** for both `cl-styles` and
-`cl-styles/tests`. This is release-candidate metadata only: the library has not
-been published to Quicklisp, Ultralisp, CLPM, or a separate source repository.
+`cl-styles/tests`. This is release-candidate metadata only: the library has a [public GitHub source repository](https://github.com/fkr-0/cl-styles), but has not been published to Quicklisp, Ultralisp, or a public CLPM index. A v0.2.0 release tag is not claimed.
 
 The qualified implementation boundary is SBCL on the repository's POSIX/Linux
 CLPM environment. Other Common Lisp implementations and non-POSIX platforms
