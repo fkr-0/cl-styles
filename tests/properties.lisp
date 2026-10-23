@@ -142,3 +142,133 @@
   (is-true (cl-styles.properties:ensure-declarations (list :height :auto)))
   (signals cl-styles.properties:style-contract-violation
     (cl-styles.properties:ensure-declarations (list :height :bogus))))
+
+(test property-contract-diagnostics-and-pair-shape
+  (let ((condition (make-condition 'cl-styles.properties:style-contract-violation
+                                   :where :height :expected :number :got :bad)))
+    (is (eq :height (cl-styles.properties:where condition)))
+    (is (eq :number (cl-styles.properties:expected condition)))
+    (is (eq :bad (cl-styles.properties:got condition)))
+    (is (search "height" (string-downcase (princ-to-string condition)))))
+  (dolist (plist '((:width) (:width 2 :color)))
+    (signals cl-styles.properties:style-contract-violation
+      (cl-styles.properties:normalize-declarations plist))
+    (signals cl-styles.properties:style-contract-violation
+      (cl-styles.properties:ensure-static-declarations plist)))
+  (signals cl-styles.properties:style-contract-violation
+    (cl-styles.properties:ensure-declarations '(:unregistered 3)))
+  (signals cl-styles.properties:style-contract-violation
+    (cl-styles.properties:ensure-static-declarations '(:unregistered 3))))
+
+(test property-normalization-preserves-data-and-canonical-aliases
+  (let ((result (cl-styles.properties:ensure-declarations
+                 '("font-family" "Liberation Mono" :fg :red
+                   :color :blue :height "50%" :bold :t
+                   :underline :nil :grid-template-columns nil))))
+    (is (string= "Liberation Mono" (getf result :font-family)))
+    (is (eq :blue (getf result :color)))
+    (is (not (member :fg result)))
+    (is (string= "50%" (getf result :height)))
+    (is (eq t (getf result :bold)))
+    (is (null (getf result :underline)))
+    (is (member :grid-template-columns result)))
+  ;; Normalization is pure: changing the result cannot modify the input.
+  (let* ((source '(:fg :red :width 5))
+         (result (cl-styles.properties:normalize-declarations source)))
+    (setf (getf result :width) 9)
+    (is (= 5 (getf source :width))))
+  (dolist (invalid '(:nope "x%" "100%%" "-1%"))
+    (signals cl-styles.properties:style-contract-violation
+      (cl-styles.properties:ensure-declarations (list :width invalid)))))
+
+(test property-types-and-range-boundaries
+  (dolist (pair '((:opacity 0) (:opacity 1) (:opacity 0.5)
+                  (:aspect-ratio 1/2) (:aspect-ratio 2)
+                  (:position :absolute) (:visibility :hidden)
+                  (:z-index -2) (:font-family "monospace")
+                  (:bold t) (:bold nil)))
+    (is (equal (second pair)
+               (getf (cl-styles.properties:ensure-declarations pair) (first pair)))))
+  (dolist (pair '((:opacity -0.1) (:opacity 1.1) (:opacity :bad)
+                  (:aspect-ratio 0) (:aspect-ratio -1)
+                  (:position :floating) (:visibility 12)
+                  (:font-family :monospace) (:z-index :center)
+                  (:bold 2)))
+    (signals cl-styles.properties:style-contract-violation
+      (cl-styles.properties:ensure-declarations pair))))
+
+(test property-defaults-and-registry-are-observable
+  (multiple-value-bind (value found)
+      (cl-styles.properties:property-default :unregistered)
+    (is (null value))
+    (is (null found)))
+  (let* ((key :cl-styles-test-explicit-default)
+         (registry cl-styles.properties::*property-registry*)
+         (prior (multiple-value-list (gethash key registry))))
+    (unwind-protect
+         (progn
+           (cl-styles.properties:register-property
+            key '(:type :number :default 0 :default-supplied-p t))
+           (multiple-value-bind (value present)
+               (cl-styles.properties:property-default key)
+             (is (= 0 value))
+             (is (not (null present))))
+           (is (= 0 (getf (cl-styles.properties:property-defaults) key)))
+           (is (equal (cl-styles.properties:property-defaults)
+                      (cl-styles.properties:property-defaults))))
+      (if (second prior)
+          (setf (gethash key registry) (first prior))
+          (remhash key registry)))))
+
+(test property-static-variable-fallback-contract
+  (let ((variable (cl-styles.tokens:var "--unknown")))
+    (is (equal (list :font-size variable)
+               (cl-styles.properties:ensure-static-declarations
+                (list :font-size variable))))
+    (is (equal (list :font-size (cl-styles.tokens:var "--unknown" 12))
+               (cl-styles.properties:ensure-static-declarations
+                (list :font-size (cl-styles.tokens:var "--unknown" 12)))))
+    (signals cl-styles.properties:style-contract-violation
+      (cl-styles.properties:ensure-static-declarations
+       (list :font-size (cl-styles.tokens:var "--unknown" :large))))
+    ;; Nested variables defer validation until the complete environment is known.
+    (is (equal (list :font-size
+                     (cl-styles.tokens:var "--unknown"
+                                           (cl-styles.tokens:var "--fallback")))
+               (cl-styles.properties:ensure-static-declarations
+                (list :font-size
+                      (cl-styles.tokens:var "--unknown"
+                                            (cl-styles.tokens:var "--fallback"))))))))
+
+(test property-group-queries-do-not-leak-registry-lists
+  (let ((copied (cl-styles.properties:properties-for-group :padding)))
+    (setf (first copied) :corrupted)
+    (is (not (member :corrupted
+                     (cl-styles.properties:properties-for-group :padding)))))
+  (is (null (cl-styles.properties:properties-for-group :no-such-group)))
+  (is (null (cl-styles.properties:properties-for-layout :no-such-layout)))
+  (is (member :gap (cl-styles.properties:properties-for-layout :flex)))
+  (is (= 1 (count :display (cl-styles.properties:properties-for-layout :flex)))))
+
+(test registered-extension-types-remain-strict
+  "Extenders can register length-typed declarations without weakening validation."
+  (let* ((key :cl-styles-test-length)
+         (registry cl-styles.properties::*property-registry*)
+         (previous (multiple-value-list (gethash key registry))))
+    (unwind-protect
+         (progn
+           (cl-styles.properties:register-property key '(:type :length))
+           (is (equal '(:px 4)
+                      (getf (cl-styles.properties:ensure-declarations
+                             (list key (cl-styles.tokens:px 4))) key)))
+           (signals cl-styles.properties:style-contract-violation
+             (cl-styles.properties:ensure-declarations (list key 4)))
+           (cl-styles.properties:register-property key '(:type :unsupported))
+           (signals error
+             (cl-styles.properties:ensure-declarations (list key :anything)))
+           (cl-styles.properties:register-property key '(:type 42))
+           (signals error
+             (cl-styles.properties:ensure-declarations (list key 42))))
+      (if (second previous)
+          (setf (gethash key registry) (first previous))
+          (remhash key registry)))))
