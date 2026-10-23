@@ -125,3 +125,79 @@
          (entry (find :color (cl-styles.engine:computed-style-result-trace result)
                       :key #'cl-styles.engine:declaration-trace-property)))
     (is (= 1 (cl-styles.engine:declaration-trace-source-order entry)))))
+
+;; Output mode semantics must not depend on the implementation-specific
+;; return value of SET-COMPUTED-STYLE (some adapters return patch receipts).
+(test objects-return-mode-keeps-input-object-identity
+  (let* ((button (make-instance 'node :id :button :nodetype :button :parent nil))
+         (sheet (make-stylesheet
+                 :rules (list (cl-styles.rule:defrule
+                               (cl-styles.selector:type> :button)
+                               :color :blue))))
+         (objects (apply-stylesheet sheet (list button) :return :objects)))
+    (is (= 1 (length objects)))
+    (is (eq button (first objects)))
+    (is (eql :blue (getf (cl-styles.protocols:get-computed-style button) :color)))
+    (let ((patches (apply-stylesheet sheet (list button) :return :patches)))
+      (is (= 1 (length patches)))
+      (is (typep (first patches) 'cl-styles.engine:style-patch)))))
+
+(test tree-object-return-mode-keeps-node-identity
+  (let* ((child (make-instance 'node :id :child :nodetype :text :parent nil))
+         (root (make-instance 'node :id :root :nodetype :container
+                                    :parent nil :children (list child)))
+         (sheet (make-stylesheet :rules nil)))
+    (setf (cl-styles.protocols:stylable-parent child) root)
+    (is (equal (list root child)
+               (apply-stylesheet-to-tree root sheet :return :objects)))))
+
+(test recomputation-after-variable-mutation-ignores-stale-cache
+  (let* ((child (make-instance 'node :id :child :nodetype :text :parent nil))
+         (root (make-instance 'node :id :root :nodetype :container
+                                    :parent nil :children (list child)))
+         (rule (cl-styles.rule:make-rule
+                :selector (cl-styles.selector:type> :container)
+                :declarations (list :color (cl-styles.tokens:var "--tone"))))
+         (sheet (make-stylesheet :rules (list rule)
+                                 :variables '(("--tone" . :red)))))
+    (setf (cl-styles.protocols:stylable-parent child) root)
+    (let ((initial (apply-stylesheet-to-tree root sheet
+                                            :cache :legacy :previous-signature :stale)))
+      (is (= 2 (length initial)))
+      (is (eql :red (getf (cl-styles.protocols:get-computed-style child) :color))))
+    (setf (cl-styles.sheet:stylesheet-variables sheet) '(("--tone" . :blue)))
+    (is (= 1 (cl-styles.sheet:stylesheet-revision sheet)))
+    (let ((result (apply-stylesheet-to-tree root sheet
+                                           :cache :legacy :previous-signature :stale)))
+      (is (= 2 (length result)))
+      (is (eql :blue (getf (cl-styles.protocols:get-computed-style root) :color)))
+      (is (eql :blue (getf (cl-styles.protocols:get-computed-style child) :color))))
+    (let ((result (explain-style child sheet)))
+      (is (= 1 (cl-styles.engine:style-revision-stylesheet
+                (cl-styles.engine:computed-style-result-revision result))))
+      (is (eql :blue (getf (cl-styles.engine:computed-style-result-style result)
+                           :color))))))
+
+(test cascade-recomputes-after-rule-reordering
+  (let* ((first (cl-styles.rule:defrule
+                 (cl-styles.selector:type> :button) :color :red))
+         (second (cl-styles.rule:defrule
+                  (cl-styles.selector:type> :button) :color :green))
+         (button (make-instance 'node :id :b :nodetype :button :parent nil))
+         (sheet (make-stylesheet :rules (list first second))))
+    (is (eql :green
+             (getf (cl-styles.engine:computed-style-result-style
+                    (explain-style button sheet)) :color)))
+    (setf (cl-styles.sheet:stylesheet-rules sheet) (list second first))
+    (is (= 1 (cl-styles.sheet:stylesheet-revision sheet)))
+    (let* ((result (explain-style button sheet))
+           (entries (remove-if-not
+                     (lambda (entry)
+                       (eq :color (cl-styles.engine:declaration-trace-property entry)))
+                     (cl-styles.engine:computed-style-result-trace result))))
+      (is (eql :red (getf (cl-styles.engine:computed-style-result-style result)
+                          :color)))
+      (is (equal '(0 1)
+                 (mapcar #'cl-styles.engine:declaration-trace-source-order entries)))
+      (is (equal '(:overridden :winner)
+                 (mapcar #'cl-styles.engine:declaration-trace-status entries))))))
