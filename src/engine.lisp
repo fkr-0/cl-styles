@@ -244,7 +244,9 @@ specificity, source order, source declarations, and variable expansion."
                     (list res)
                     (list (make-style-patch :path (list :by-key (cl-styles.protocols:stylable-key node))
                                             :computed style))))
-      (:objects (list res)))))
+      ;; A protocol implementation may return a patch receipt or another value;
+      ;; :OBJECTS promises the original, now-styled nodes, not the setter result.
+      (:objects (list node)))))
 
 (defun apply-stylesheet (sheet objects &key (return :patches))
   "Apply SHEET to a flat list of OBJECTS, returning either :patches or :objects.
