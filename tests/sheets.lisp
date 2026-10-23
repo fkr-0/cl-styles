@@ -221,3 +221,31 @@
                'cl-styles.sheet:stylesheet))
     (signals cl-styles.tokens:missing-style-variable
       (make-stylesheet :rules (list rule) :variables nil))))
+
+(test stylesheet-add-rule-preserves-source-order-and-revisions
+  "Appending equal-specificity rules must preserve source order and count mutations."
+  (let* ((red (test-button-rule :red))
+         (blue (test-button-rule :blue))
+         (sheet (make-stylesheet :rules (list red))))
+    (is (eq sheet (add-rule sheet blue)))
+    (is (equal (list red blue) (stylesheet-rules sheet)))
+    (is (= 1 (cl-styles.sheet:stylesheet-revision sheet)))
+    ;; Equal rules are still distinct entries in the cascade's source order.
+    (add-rule sheet red)
+    (is (equal (list red blue red) (stylesheet-rules sheet)))
+    (is (= 2 (cl-styles.sheet:stylesheet-revision sheet)))
+    ;; REMOVE-RULE removes every structurally equal occurrence, not just one.
+    (remove-rule sheet red)
+    (is (equal (list blue) (stylesheet-rules sheet)))
+    (is (= 3 (cl-styles.sheet:stylesheet-revision sheet)))))
+
+(test stylesheet-add-rule-invalid-input-keeps-existing-cascade
+  "A rejected append must not alter either rules or the revision."
+  (let* ((red (test-button-rule :red))
+         (sheet (make-stylesheet :rules (list red))))
+    (signals cl-styles.rule:invalid-rule
+      (add-rule sheet :not-a-rule))
+    (is (equal (list red) (stylesheet-rules sheet)))
+    (is (= 0 (cl-styles.sheet:stylesheet-revision sheet)))
+    (add-rule sheet (test-button-rule :blue))
+    (is (= 1 (cl-styles.sheet:stylesheet-revision sheet)))))
