@@ -36,9 +36,11 @@ canonical declaration vocabulary."
     (dolist (attribute '(:bold :italic :underline :inverse :faint
                          :blink :strike :invisible))
       (when (member attribute out :test #'eql)
-        (unless (member (getf out attribute) '(nil :nil) :test #'eql)
-          (pushnew attribute attrs :test #'eql))
+        (if (member (getf out attribute) '(nil :nil) :test #'eql)
+            (setf attrs (remove attribute attrs :test #'eql))
+            (pushnew attribute attrs :test #'eql))
         (remf out attribute)))
+    (remf out :attributes)
     (when attrs
       (setf (getf out :attributes) (nreverse attrs)))
     (dolist (property '(:color :background-color :border-color
@@ -82,8 +84,10 @@ only needs a small alias-aware projection."
                               (getf plist :attrs)))))
     (dolist (attribute '(:bold :italic :underline :inverse :faint
                          :blink :strike :invisible))
-      (when (getf plist attribute)
-        (pushnew attribute attrs :test #'eql)))
+      (when (member attribute plist :test #'eql)
+        (if (member (getf plist attribute) '(nil :nil) :test #'eql)
+            (setf attrs (remove attribute attrs :test #'eql))
+            (pushnew attribute attrs :test #'eql))))
     (list :fg-color fg
           :bg-color bg
           :attrs attrs)))

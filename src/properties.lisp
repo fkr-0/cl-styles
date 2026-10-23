@@ -74,6 +74,28 @@
     (cond
       ;; Preserve strings for string properties
       ((and (eq type-of-prop :string) (stringp v)) v)
+      ((and (member prop '(:width :height :flex-basis))
+            (stringp v)
+            (> (length v) 1)
+            (char= #\% (char v (1- (length v)))))
+       v)
+      ((and (member prop '(:color :background-color :border-color
+                          :border-top-color :border-right-color
+                          :border-bottom-color :border-left-color
+                          :text-background-color))
+            (stringp v)
+            (plusp (length v))
+            (char= #\# (char v 0)))
+       v)
+      ;; Booleans are data, not keyword identifiers; :T/:NIL spellings are
+      ;; accepted for compatibility at the TUI boundary.
+      ((eq type-of-prop :boolean)
+       (cond ((member v '(t :t)) t)
+             ((member v '(nil :nil)) nil)
+             (t v)))
+      ;; NIL is a real value for optional declarations, e.g. empty grid
+      ;; templates, and must not be converted to the keyword :NIL.
+      ((null v) nil)
       ;; Handle synonyms
       ((and syns (hash-table-p syns))
         (let ((vv (%ensure-keyword v)))
@@ -101,6 +123,8 @@
           ((keywordp type)
             (case type
               (:keyword (unless (%keyword-p nv) (fail :keyword)))
+              (:boolean (unless (or (eq nv t) (null nv))
+                          (fail :boolean)))
               (:number  (unless (%number-p nv)  (fail :number)))
               (:length  (unless (%length-p nv)  (fail :length)))
               (:string  (unless (%string-p nv)  (fail :string)))
@@ -247,7 +271,11 @@ Variable references are type-checked after resolution; a literal fallback is che
 (defun %dimension-value-p (value)
   "Accept the dimension forms cl-styles preserves losslessly for ElmTUI."
   (or (numberp value)
-      (member value '(:auto :fill) :test #'eql)))
+      (member value '(:auto :fill) :test #'eql)
+      (and (stringp value)
+           (> (length value) 1)
+           (char= #\% (char value (1- (length value))))
+           (every #'digit-char-p (subseq value 0 (1- (length value)))))))
 
 (defproperty :width  :type (lambda (value) (%dimension-value-p value)))
 (defproperty :height :type (lambda (value) (%dimension-value-p value)))
@@ -297,7 +325,7 @@ Variable references are type-checked after resolution; a literal fallback is che
 (defproperty :order :type :number)
 (defproperty :flex-grow :type :number)
 (defproperty :flex-shrink :type :number)
-(defproperty :flex-basis :type :number)
+(defproperty :flex-basis :type (lambda (value) (%dimension-value-p value)))
 
 ;; grid props
 (defproperty :grid-template-columns :type (lambda (v) (or (null v) (listp v))))
@@ -307,6 +335,8 @@ Variable references are type-checked after resolution; a literal fallback is che
 (defproperty :grid-auto-columns     :type (lambda (v) (or (null v) (listp v) (numberp v))))
 (defproperty :grid-auto-rows        :type (lambda (v) (or (null v) (listp v) (numberp v))))
 (defproperty :justify-items         :type :keyword :enum (:start :end :center :stretch))
+(defproperty :align-self :type :keyword
+  :enum (:auto :stretch :flex-start :flex-end :center :baseline))
 
 ;; box props
 (defproperty :padding :type (lambda (v) (or (numberp v) (listp v))))
@@ -368,6 +398,28 @@ Variable references are type-checked after resolution; a literal fallback is che
                                 :test #'eql))
                       value))))
 (register-property-alias :attrs :attributes)
+
+;; Public normal-screen layout/visibility properties used by ElmTUI. Keep the
+;; strict style contract synchronized with real layout/painter consumers.
+(defproperty :white-space :type :keyword :enum (:normal :nowrap))
+(defproperty :overflow :type :keyword :enum (:visible :hidden :auto :scroll))
+(defproperty :visibility :type :keyword :enum (:visible :hidden))
+(defproperty :aspect-ratio :type (lambda (v) (and (realp v) (> v 0))))
+(defproperty :z-index :type :number)
+(defproperty :position :type :keyword :enum (:static :relative :absolute))
+(defproperty :border-radius :type :number)
+(defproperty :font-style :type :keyword :enum (:normal :italic :oblique))
+(defproperty :text-background-color :type (lambda (v)
+  (or (keywordp v) (cl-styles.tokens:color-p v))))
+(register-property-alias :text-color :color)
+(register-property-alias :direction :flex-direction)
+(register-property-alias :justify :justify-content)
+(register-property-alias :align :align-items)
+(register-property-alias :spacing :gap)
+(register-property-alias :grid-gap :gap)
+(dolist (attribute '(:bold :italic :underline :inverse :faint
+                     :blink :strike :invisible))
+  (register-property attribute (list :type :boolean :enum nil)))
 
 (defproperty :opacity
   :type (lambda (v) (and (realp v) (<= 0 v 1))))

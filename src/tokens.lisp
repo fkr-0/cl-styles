@@ -5,13 +5,29 @@
 (defun rgba (r g b a) (list :rgba r g b a))
 (defun hsl  (h s l)  (list :hsl h s l))
 (defun color-p (x)
-  "Accept normalized CSS colors and the ElmTUI 256-color palette token."
-  (and (consp x)
-       (or (member (first x) '(:rgb :rgba :hsl))
-           (and (eq (first x) :256)
-                (= (length x) 2)
-                (integerp (second x))
-                (<= 0 (second x) 255)))))
+  "Colors supported by the ElmTUI terminal conversion boundary.
+RGB channels are 8-bit integers; HSL saturation/lightness are percentages."
+  (labels ((byte-p (n) (and (integerp n) (<= 0 n 255))))
+    (cond
+      ((and (integerp x) (byte-p x)) t)
+      ((and (stringp x) (= (length x) 7)
+            (char= #\# (char x 0)))
+       (every (lambda (char) (digit-char-p char 16)) (subseq x 1)))
+      ((and (listp x) (= (length x) 3)
+            (every #'byte-p x)) t)
+      ((consp x)
+       (case (first x)
+         (:rgb (and (= (length x) 4) (every #'byte-p (rest x))))
+         (:rgba (and (= (length x) 5)
+                     (every #'byte-p (subseq x 1 4))
+                     (realp (fifth x)) (<= 0 (fifth x) 1)))
+         (:hsl (and (= (length x) 4)
+                    (realp (second x))
+                    (realp (third x)) (<= 0 (third x) 100)
+                    (realp (fourth x)) (<= 0 (fourth x) 100)))
+         (:256 (and (= (length x) 2) (byte-p (second x))))
+         (otherwise nil)))
+      (t nil))))
 
 ;; Lengths
 (defun px (n)       (list :px n))
