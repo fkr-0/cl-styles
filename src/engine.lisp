@@ -25,9 +25,10 @@ Example:
   => ((:COLOR :RED :WIDTH 20 :HEIGHT 30)
 (:COLOR :RED :WIDTH 10)
 (:WIDTH 20 :HEIGHT 30))"
-   (loop for (k v) on b by #'cddr
-         do (setf (getf a k) v))
-   (copy-list a))
+   (let ((merged (copy-list a)))
+     (loop for (k v) on b by #'cddr
+           do (setf (getf merged k) v))
+     merged))
 ;; (let* ((a '(:color :red :width 10))
 ;;        (b '(:width 20 :height 30))
 ;;        (x (list a b))

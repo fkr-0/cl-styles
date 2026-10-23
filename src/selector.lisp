@@ -160,8 +160,10 @@
                (:and (every (lambda (x) (rec x n)) (cdr s)))
                (:or  (some  (lambda (x) (rec x n)) (cdr s)))
                (:not (not (rec (second s) n)))
-               (:child (and (rec (second s) (stylable-parent n))
-                            (rec (third  s) n)))
+               (:child (let ((parent (stylable-parent n)))
+                         (and parent
+                              (rec (second s) parent)
+                              (rec (third s) n))))
                (:desc  (labels ((up (m)
                                   (cond
                                     ((null m) nil)
