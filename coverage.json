@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "label": "coverage",
-  "message": "60.42%",
+  "message": "72.32%",
   "color": "blue",
-  "covered": 774,
-  "total": 1281
+  "covered": 980,
+  "total": 1355
 }
